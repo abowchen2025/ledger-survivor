@@ -4,8 +4,8 @@
 
 ## 權威文件（改動前先讀，衝突時以此順序為準）
 
-1. `docs/srs_fs_v1_1.md` — SRS+FS，功能模組 4.1～4.12 各含畫面／API／業務規則／驗收條件
-2. `docs/test_conditions_v1_0.yaml` — 測試條件，Claude Code 依 `script` 路徑產生對應測試碼
+1. `docs/srs_fs_v1_2.md` — SRS+FS，功能模組 4.1～4.12 各含畫面／API／業務規則／驗收條件；每條規則帶 REQ 編號，附錄含需求追溯矩陣
+2. `docs/test_conditions_v1_0.yaml` — 測試條件，Claude Code 依 `script` 路徑產生對應測試碼；`req` 欄位回追 SRS 的 REQ 編號
 3. `docs/architecture_v2_2.md` — 系統架構描述，設計理由與範圍界線
 4. `docs/adr/` — 架構決策記錄，一個決策一個檔
 

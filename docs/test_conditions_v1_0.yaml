@@ -1,0 +1,646 @@
+# 記帳生存遊戲（Ledger Survivor）測試條件 v1.0
+# 日期：2026-09-16
+# 依據：SRS+FS v1.1（req 欄回追對應 REQ 編號）、架構描述 v2.2 第11節（品質與驗證，11.5高風險區重點覆蓋）
+# 格式骨架：rachel-qa TC 格式（分類標準：AUTH／SEC／FUNC／UI／E2E／EDGE／NEG／PERF）
+# 用途：Claude Code 讀取本檔案後，依 script 路徑產生對應測試碼；執行結果回填 actual／status 供規劃端判讀
+# 優先級：P0（核心不可妥協，上線前必過）／P1（重要）／P2（次要，可延後）
+
+# ============================================================
+# 模組：WEEK — 週上限與時間規則（11.5 高風險核心：週歸屬算錯）
+# ============================================================
+
+- id: TC-EDGE-WEEK-001
+  req: REQ-WEEK-001
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_week_rule.py::test_week_belongs_to_month_thursday_boundary
+  preconditions: 讀取 tests/fixtures/week_cases.json 的邊界案例
+  action: 輸入 2026-09-28（週一）～2026-10-04（週日），呼叫 week_rule 函式
+  expected: 週四為2026-10-01，整週歸屬2026年10月第1週，非9月
+
+- id: TC-EDGE-WEEK-002
+  req: REQ-WEEK-001
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_week_rule.py::test_week_belongs_to_month_prior_boundary
+  preconditions: 同上
+  action: 輸入 2026-08-31（週一）～2026-09-06（週日），呼叫 week_rule 函式
+  expected: 週四為2026-09-03，整週歸屬2026年9月第1週，非8月
+
+- id: TC-FUNC-WEEK-003
+  req: REQ-WEEK-002
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_week_rule.py::test_month_week_count_4_or_5
+  preconditions: 準備至少一個4週月份與一個5週月份的樣本月
+  action: 對兩個樣本月分別呼叫週數計算函式
+  expected: 回傳值與人工依週四規則手算結果一致（4或5）
+
+- id: TC-SEC-WEEK-004
+  req: REQ-NFR-003
+  category: SEC
+  priority: P0
+  script: tests/integration/test_week_rule_consistency.py::test_frontend_backend_same_fixture
+  preconditions: 前後端 week_rule 實作皆已完成
+  action: 前端與後端分別對 tests/fixtures/week_cases.json 全部案例執行 week_rule
+  expected: 兩端輸出結果逐筆比對完全一致，任一筆不一致視為 Blocker，CI 擋合併
+
+- id: TC-FUNC-WEEK-005
+  req: REQ-WEEK-004
+  category: FUNC
+  priority: P0
+  script: tests/api/test_weeks.py::test_week_target_locked_after_week_end
+  preconditions: 指定週的結束日期已過（週日23:59已過）
+  action: PUT /weeks/{yyyy}-W{ww}/target 嘗試覆寫已結束週的上限
+  expected: HTTP 409，回應訊息說明該週已鎖定不可修改
+
+- id: TC-UI-WEEK-006
+  req: REQ-UI-001
+  category: UI
+  priority: P1
+  script: tests/e2e/test_calendar_view.py::test_cross_month_week_label
+  preconditions: 月曆頁載入含跨月週的月份（如2026年9月或10月）
+  action: 檢視月曆頁2026-09-28～10-04所在週的呈現
+  expected: 該週日期在9月與10月月曆皆出現，並顯示「這週算10月」小標籤
+
+# ============================================================
+# 模組：CARD — 信用卡主檔（11.5高風險：繳款月偏移推算）
+# ============================================================
+
+- id: TC-EDGE-CARD-001
+  req: REQ-CARD-002
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_card_due_offset.py::test_due_before_statement_next_month
+  preconditions: 無
+  action: 建立信用卡，結帳日27、繳款日15
+  expected: due_month_offset 自動推算為1（次月）
+
+- id: TC-EDGE-CARD-002
+  req: REQ-CARD-002
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_card_due_offset.py::test_due_after_statement_same_month
+  preconditions: 無
+  action: 建立信用卡，結帳日1、繳款日20
+  expected: due_month_offset 自動推算為0（同月）
+
+- id: TC-NEG-CARD-003
+  req: REQ-CARD-002
+  category: NEG
+  priority: P1
+  script: tests/api/test_cards.py::test_due_offset_override_recalculates_on_source_change
+  preconditions: 卡片已建立且 due_month_offset 已被手動覆寫
+  action: PUT /cards/{id} 修改結帳日或繳款日（來源欄位）
+  expected: 系統依新的結帳日/繳款日重新推算 due_month_offset，不沿用舊的覆寫值（或明確提示覆寫值可能已過期）
+
+- id: TC-FUNC-CARD-004
+  req: REQ-CARD-004
+  category: FUNC
+  priority: P0
+  script: tests/api/test_cards.py::test_delete_referenced_card_returns_403
+  preconditions: 卡片已被至少一筆 expenses 或 installments 引用
+  action: DELETE /cards/{id}
+  expected: HTTP 403，回應訊息提示改用停用
+
+# ============================================================
+# 模組：INSTALL — 分期（11.5最高風險：首期月推算錯誤、兩個時鐘混用）
+# ============================================================
+
+- id: TC-EDGE-INSTALL-001
+  req: REQ-INSTALL-002
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_installment_first_month.py::test_purchase_on_statement_day
+  preconditions: 卡片結帳日27、due_month_offset=1
+  action: 建立分期，消費日=結帳日當天（27日）
+  expected: 帳單月=消費月（dd≤s），繳款月=帳單月+1，首期繳款月推算正確
+
+- id: TC-EDGE-INSTALL-002
+  req: REQ-INSTALL-002
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_installment_first_month.py::test_purchase_day_after_statement
+  preconditions: 卡片結帳日27、due_month_offset=1
+  action: 建立分期，消費日=結帳日後一天（28日）
+  expected: 帳單月=消費月+1（dd>s），繳款月再+1，首期繳款月比消費日=27日的案例多延一個月
+
+- id: TC-EDGE-INSTALL-003
+  req: REQ-INSTALL-002
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_installment_first_month.py::test_purchase_crossing_year
+  preconditions: 卡片結帳日27、繳款日15、due_month_offset=1
+  action: 建立分期，消費日=12月30日
+  expected: 帳單月為次年1月，繳款月為次年2月，年份正確進位
+
+- id: TC-EDGE-INSTALL-004
+  req: REQ-CARD-006
+  category: EDGE
+  priority: P0
+  script: tests/unit/test_installment_first_month.py::test_statement_day_31_in_30day_month
+  preconditions: 卡片結帳日設為31
+  action: 建立分期，消費日落在只有30天的月份（如4月）
+  expected: 結帳日視為該月最後一天（30日）進行帳單月判定，不因31日不存在而報錯或算錯
+
+- id: TC-FUNC-INSTALL-005
+  req: REQ-INSTALL-002
+  category: FUNC
+  priority: P0
+  script: tests/api/test_installments.py::test_9_23_first_period_falls_october
+  preconditions: 卡片結帳日27、繳款日15（due_month_offset=1）
+  action: 建立分期，消費日=2026-09-23
+  expected: 首期繳款月=2026-10（架構描述4.6.3範例案例，Phase2驗收標準明列）
+
+- id: TC-NEG-INSTALL-006
+  req: REQ-INSTALL-003
+  category: NEG
+  priority: P1
+  script: tests/api/test_installments.py::test_override_first_month_without_reason_rejected
+  preconditions: 無
+  action: PUT /installments/{id} 覆寫 first_month 但不填 first_month_override_reason
+  expected: HTTP 400，回應訊息提示須填寫覆寫原因
+
+- id: TC-NEG-INSTALL-007
+  req: REQ-INCOME-006
+  category: NEG
+  priority: P0
+  script: tests/unit/test_budget_calculation.py::test_installment_not_double_counted
+  preconditions: 存在一筆進行中的分期
+  action: 分別計算「分期月付」扣項與「週花費」，確認同一筆分期不被同時計入兩處
+  expected: 分期月付僅計入月可支配金額扣項；週花費不含任何分期期款；兩者加總不重複扣款（對應11.5「兩個時鐘混用」風險）
+
+- id: TC-NEG-INSTALL-008
+  req: REQ-CARD-003
+  category: NEG
+  priority: P0
+  script: tests/unit/test_cashflow_calculation.py::test_opening_debt_not_in_category_analysis
+  preconditions: 卡片有期初未付卡債（opening_billed_unpaid或opening_unbilled大於0）
+  action: 呼叫分類分析計算函式
+  expected: 期初卡債金額不出現在任何分類佔比或分析結果中（對應11.5「期初卡債誤入分類分析」風險）
+
+# ============================================================
+# 模組：CASHFLOW — 現金流
+# ============================================================
+
+- id: TC-FUNC-CASHFLOW-001
+  req: REQ-CASHFLOW-005
+  category: FUNC
+  priority: P1
+  script: tests/api/test_cashflow.py::test_gap_month_flagged
+  preconditions: 未來預估月份的支出總和大於收入
+  action: GET /cashflow/forecast
+  expected: 該月 gap 為負值，回應中明確標示為缺口月份
+
+- id: TC-EDGE-CASHFLOW-002
+  req: REQ-CASHFLOW-004
+  category: EDGE
+  priority: P1
+  script: tests/unit/test_cashflow_calculation.py::test_opening_debt_steady_state
+  preconditions: 期初卡債對應的繳款月已過
+  action: 呼叫現金流計算函式（該月之後的月份）
+  expected: 期初卡債欄位保留但不再產生現金流影響
+
+- id: TC-FUNC-CASHFLOW-003
+  req: REQ-CARD-005
+  category: FUNC
+  priority: P1
+  script: tests/api/test_cashflow.py::test_deactivated_card_installment_still_counted
+  preconditions: 卡片已停用（is_active=false），但有未結清分期
+  action: GET /cashflow/{yyyy-mm}
+  expected: 該卡未結清分期的期款仍正確計入現金流明細，不因卡片停用而消失
+
+- id: TC-PERF-CASHFLOW-004
+  req: REQ-CASHFLOW-002
+  category: PERF
+  priority: P2
+  script: tests/api/test_cashflow.py::test_forecast_6_months_response_time
+  preconditions: 資料庫含至少12個月的花費與分期歷史資料
+  action: GET /cashflow/forecast?months=6
+  expected: 回應時間在可接受範圍內（建議<1秒），回傳6筆月份資料
+
+# ============================================================
+# 模組：EXPENSE — 花費記錄（11.5高風險：獎勵誤計、時區）
+# ============================================================
+
+- id: TC-FUNC-EXPENSE-001
+  req: REQ-EXPENSE-003
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_scoring.py::test_reward_category_excluded_from_weekly_spend
+  preconditions: 本週已有一筆分類為「獎勵」的花費
+  action: 計算該週花費 E
+  expected: 「獎勵」分類花費不計入 E（對應11.5「獎勵被計入週花費」風險——存了錢還被扣分）
+
+- id: TC-FUNC-EXPENSE-002
+  req: REQ-EXPENSE-004
+  category: FUNC
+  priority: P0
+  script: tests/api/test_expenses.py::test_credit_card_uses_purchase_date_not_statement_date
+  preconditions: 信用卡消費日與結帳日不同週
+  action: 新增一筆信用卡消費，比對該筆計入哪一週的週花費
+  expected: 以消費日所屬週計入週花費，不以結帳日或繳款日判斷所屬週
+
+- id: TC-EDGE-EXPENSE-003
+  req: REQ-WEEK-005
+  category: EDGE
+  priority: P0
+  script: tests/api/test_expenses.py::test_late_night_expense_correct_date
+  preconditions: 系統時區設定為 Asia/Taipei
+  action: 於當地時間23:59新增一筆花費（date欄位留空，使用系統預設今天）
+  expected: 花費日期正確記為當天，非隔天（對應11.5「時區」風險）
+
+- id: TC-NEG-EXPENSE-004
+  req: REQ-EXPENSE-001
+  category: NEG
+  priority: P0
+  script: tests/api/test_expenses.py::test_amount_zero_rejected
+  preconditions: 無
+  action: POST /expenses 金額欄位填0
+  expected: HTTP 400，回應訊息「金額不可為0」
+
+- id: TC-FUNC-EXPENSE-005
+  req: REQ-EXPENSE-001
+  category: FUNC
+  priority: P1
+  script: tests/api/test_expenses.py::test_negative_amount_refund_accepted
+  preconditions: 無
+  action: POST /expenses 金額填負數（如-500）
+  expected: HTTP 201，正常寫入視為退款
+
+- id: TC-NEG-EXPENSE-006
+  req: REQ-EXPENSE-005
+  category: NEG
+  priority: P0
+  script: tests/api/test_expenses.py::test_settled_month_blocks_backfill
+  preconditions: 該月已執行月結（reward_ledger已有紀錄）
+  action: POST /expenses 新增該月內任一日期的花費
+  expected: HTTP 409，回應訊息提示須先取消結算
+
+# ============================================================
+# 模組：INCOME — 收入與可支配金額（11.5高風險：固定支出過期仍扣、修改月薪影響過去）
+# ============================================================
+
+- id: TC-FUNC-INCOME-001
+  req: REQ-INCOME-004
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_budget_calculation.py::test_expired_recurring_expense_excluded
+  preconditions: 固定支出已設定 end_month，且計算月份晚於 end_month
+  action: 計算該月月可支配金額
+  expected: 已過期的固定支出不計入扣項（對應11.5「固定支出過期仍扣」風險）
+
+- id: TC-NEG-INCOME-002
+  req: REQ-INCOME-008
+  category: NEG
+  priority: P0
+  script: tests/api/test_income.py::test_salary_change_not_affect_locked_week
+  preconditions: 上月已有週被鎖定（locked_at已設定）
+  action: PUT /months/{yyyy-mm}/income 修改本月月薪
+  expected: 已鎖定週的週上限維持原值不變（對應11.5「修改月薪影響過去」風險）
+
+- id: TC-FUNC-INCOME-003
+  req: REQ-INCOME-002
+  category: FUNC
+  priority: P1
+  script: tests/api/test_income.py::test_new_month_defaults_to_prior_salary
+  preconditions: 上月已有月薪紀錄，本月尚未設定
+  action: GET /months/{yyyy-mm}
+  expected: 月薪欄位預設帶入上月金額
+
+- id: TC-NEG-INCOME-004
+  req: REQ-INCOME-001
+  category: NEG
+  priority: P1
+  script: tests/api/test_income.py::test_negative_salary_rejected
+  preconditions: 無
+  action: PUT /months/{yyyy-mm}/income 月薪填負數
+  expected: HTTP 400，回應訊息「月薪不可為負數」
+
+# ============================================================
+# 模組：CATEGORY — 消費分類體系（11.5高風險：分類異動、自訂上限）
+# ============================================================
+
+- id: TC-FUNC-CATEGORY-001
+  req: REQ-CATEGORY-002
+  category: FUNC
+  priority: P0
+  script: tests/api/test_categories.py::test_builtin_group_cannot_be_deleted
+  preconditions: 內建一級分類（如「食」）
+  action: 嘗試對內建一級分類執行刪除操作
+  expected: 操作被拒絕（內建類不適用刪除，僅能編輯或（自訂類）停用）
+
+- id: TC-NEG-CATEGORY-002
+  req: REQ-CATEGORY-003
+  category: NEG
+  priority: P0
+  script: tests/api/test_categories.py::test_custom_group_limit_enforced
+  preconditions: 已有2個自訂一級分類
+  action: POST /category-groups 再新增第3個自訂一級分類
+  expected: HTTP 409，回應訊息提示已達上限（對應11.5「自訂分類上限」風險）
+
+- id: TC-NEG-CATEGORY-003
+  req: REQ-CATEGORY-003
+  category: NEG
+  priority: P1
+  script: tests/api/test_categories.py::test_custom_group_without_moved_category_rejected
+  preconditions: 未達自訂上限
+  action: POST /category-groups 新增自訂一級分類但不指定 move_categories
+  expected: HTTP 400，回應訊息提示須至少搬移一個既有子分類
+
+- id: TC-FUNC-CATEGORY-004
+  req: REQ-CATEGORY-004
+  category: FUNC
+  priority: P1
+  script: tests/api/test_categories.py::test_benchmark_sum_check_after_custom_add
+  preconditions: 新增自訂一級分類後，全部一級分類基準總和超出90-110%
+  action: 觀察 POST /category-groups 的回應
+  expected: 回傳警示訊息但仍成功寫入（不擋下儲存，僅提示）
+
+- id: TC-FUNC-CATEGORY-005
+  req: REQ-CATEGORY-007
+  category: FUNC
+  priority: P0
+  script: tests/api/test_categories.py::test_referenced_category_soft_deleted
+  preconditions: 二級分類已被至少一筆 expenses 引用
+  action: DELETE /categories/{id}
+  expected: HTTP 200，該分類 is_active 改為 false，非硬刪除，原引用的 expenses 不受影響
+
+- id: TC-NEG-CATEGORY-006
+  req: REQ-CATEGORY-006
+  category: NEG
+  priority: P2
+  script: tests/api/test_categories.py::test_blacklisted_name_warns
+  preconditions: 無
+  action: 新增自訂一級分類，名稱填「其他」
+  expected: 前端出現提示「請換一個更具體的分類名稱」
+
+- id: TC-FUNC-CATEGORY-007
+  req: REQ-CATEGORY-008
+  category: FUNC
+  priority: P0
+  script: tests/api/test_analysis.py::test_analysis_uses_category_structure_at_the_time
+  preconditions: 過去某月存在後續已停用的一級分類，該月有對應花費紀錄
+  action: GET /months/{該過去月份}/analysis
+  expected: 分析結果使用當月實際存在且啟用的分類結構計算，不追溯套用現在的結構（對應11.5「分類異動」風險）
+
+# ============================================================
+# 模組：SCORE — 週計分（公式邊界與連勝/超支狀態機）
+# ============================================================
+
+- id: TC-FUNC-SCORE-001
+  req: REQ-SCORE-003
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_scoring.py::test_survival_score_when_r_zero
+  preconditions: 週餘額 R 恰好等於0
+  action: 計算週分數
+  expected: R≥0成立，得存活分+10
+
+- id: TC-EDGE-SCORE-002
+  req: REQ-SCORE-005
+  category: EDGE
+  priority: P1
+  script: tests/unit/test_scoring.py::test_bonus_score_take_higher_not_stack
+  preconditions: 餘額率 r=55%（同時滿足≥30%與≥50%兩個門檻）
+  action: 計算豐收加分
+  expected: 得分為+10（取高者），非+5+10=+15
+
+- id: TC-FUNC-SCORE-003
+  req: REQ-SCORE-006
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_scoring.py::test_streak_bonus_accumulation
+  preconditions: 連續4週皆存活
+  action: 計算第4週的連勝加乘
+  expected: 從第2週起每週+3，第4週累計+9（連續第2、3、4週各+3）
+
+- id: TC-EDGE-SCORE-004
+  req: REQ-SCORE-006
+  category: EDGE
+  priority: P1
+  script: tests/unit/test_scoring.py::test_streak_bonus_capped_at_9
+  preconditions: 連續7週皆存活
+  action: 計算第7週的連勝加乘
+  expected: 加乘封頂於+9，不因連勝週數增加而無上限累加
+
+- id: TC-FUNC-SCORE-005
+  req: REQ-SCORE-007
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_scoring.py::test_streak_reset_on_overspend
+  preconditions: 前3週連勝，第4週超支
+  action: 計算第4週與第5週（若第5週存活）的連勝加乘
+  expected: 第4週連勝歸零，第5週視為連勝重新起算第1週（無加乘）
+
+- id: TC-EDGE-SCORE-006
+  req: REQ-SCORE-008
+  category: EDGE
+  priority: P1
+  script: tests/unit/test_scoring.py::test_weekly_score_upper_lower_bound
+  preconditions: 建構理論最高分情境（存活+滿額豐收+連勝封頂）與理論最低分情境（大幅超支）
+  action: 分別計算兩種情境的週分數
+  expected: 最高不超過+39，最低不低於−15
+
+- id: TC-UI-SCORE-007
+  req: REQ-UI-001
+  category: UI
+  priority: P1
+  script: tests/e2e/test_home_hp_bar.py::test_hp_bar_color_thresholds
+  preconditions: 分別建構HP%=25%、15%、0%、−10% 四種週狀態
+  action: 檢視首頁HP條樣式
+  expected: 25%為綠色系；15%為黃/紅警示色；0%顯示「瀕死」；−10%顯示「陣亡」且記帳功能仍可用
+
+# ============================================================
+# 模組：SETTLE — 月結（唯一約束與鎖定/解鎖狀態機）
+# ============================================================
+
+- id: TC-NEG-SETTLE-001
+  req: REQ-SETTLE-002
+  category: NEG
+  priority: P0
+  script: tests/api/test_settle.py::test_duplicate_settle_returns_409
+  preconditions: 該月已執行過月結
+  action: 再次 POST /months/{yyyy-mm}/settle
+  expected: HTTP 409，回應訊息提示該月已結算
+
+- id: TC-NEG-SETTLE-002
+  req: REQ-SETTLE-001
+  category: NEG
+  priority: P0
+  script: tests/api/test_settle.py::test_settle_before_month_end_rejected
+  preconditions: 目標月份尚未結束
+  action: POST /months/{yyyy-mm}/settle（yyyy-mm為當前未結束月份）
+  expected: HTTP 400，回應訊息提示該月尚未結束
+
+- id: TC-FUNC-SETTLE-003
+  req: REQ-SETTLE-003
+  category: FUNC
+  priority: P0
+  script: tests/api/test_settle.py::test_cancel_settle_unlocks_backfill
+  preconditions: 該月已結算
+  action: DELETE /months/{yyyy-mm}/settle，接著 POST /expenses 補登該月花費
+  expected: 取消結算回204；補登花費成功（回201），不再回409
+
+- id: TC-FUNC-SETTLE-004
+  req: REQ-SETTLE-001
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_settle_grade.py::test_grade_boundaries
+  preconditions: 分別建構平均週分=28、20、12、0、−1的樣本
+  action: 計算對應月等級
+  expected: 依序對應 S／A／B／C／陣亡
+
+- id: TC-FUNC-SETTLE-005
+  req: REQ-SETTLE-001
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_settle_grade.py::test_dead_grade_by_single_week_overspend_rate
+  preconditions: 平均週分≥0但任一週超支率達50%
+  action: 計算月等級
+  expected: 判定為陣亡（單週超支率≥50%的例外規則優先於平均週分規則）
+
+# ============================================================
+# 模組：REWARD — 獎勵機制與獎勵池
+# ============================================================
+
+- id: TC-FUNC-REWARD-001
+  req: REQ-REWARD-001
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_reward_calc.py::test_reward_amount_by_grade_ratio
+  preconditions: 已知月正餘額合計與月等級（如S級）
+  action: 計算獎勵金
+  expected: 獎勵金＝月正餘額合計×30%（S級比例）
+
+- id: TC-FUNC-REWARD-002
+  req: REQ-REWARD-003
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_reward_calc.py::test_consume_pool_balance_calculation
+  preconditions: 歷史reward_ledger有多筆consume_pool_delta，且有多筆「獎勵」分類花費
+  action: GET /rewards
+  expected: 消費池餘額＝歷史consume_pool_delta加總－歷史「獎勵」分類花費加總，計算結果正確
+
+- id: TC-FUNC-REWARD-003
+  req: REQ-REWARD-005
+  category: FUNC
+  priority: P1
+  script: tests/unit/test_reward_calc.py::test_dead_grade_freezes_pool
+  preconditions: 本月判定為陣亡等級
+  action: 計算本月獎勵金與分流
+  expected: 獎勵金為0，獎勵池凍結（本月不產生新的分流）
+
+- id: TC-FUNC-REWARD-004
+  req: REQ-REWARD-006
+  category: FUNC
+  priority: P1
+  script: tests/unit/test_reward_calc.py::test_boss_reward_unlock_after_3_consecutive_a
+  preconditions: 連續3個月月等級皆為A或以上
+  action: 計算當月獎勵
+  expected: 額外解鎖Boss獎勵，可動用月正餘額10%，全數分流至消費池
+
+# ============================================================
+# 模組：ACHIEVE — 成就
+# ============================================================
+
+- id: TC-NEG-ACHIEVE-001
+  req: REQ-ACHIEVE-002
+  category: NEG
+  priority: P1
+  script: tests/unit/test_achievements.py::test_achievement_unlock_once_only
+  preconditions: 「四連勝」成就已解鎖過一次
+  action: 再次觸發四連勝條件
+  expected: 不產生第二筆解鎖紀錄，achievements表該筆維持唯一
+
+- id: TC-FUNC-ACHIEVE-002
+  req: REQ-ACHIEVE-001
+  category: FUNC
+  priority: P2
+  script: tests/unit/test_achievements.py::test_iron_month_no_overspend
+  preconditions: 整月所有週皆存活無超支
+  action: 月結時檢查成就觸發
+  expected: 「鐵人月」成就正確解鎖
+
+# ============================================================
+# 模組：ANALYSIS — 分析頁
+# ============================================================
+
+- id: TC-FUNC-ANALYSIS-001
+  req: REQ-ANALYSIS-004
+  category: FUNC
+  priority: P1
+  script: tests/api/test_analysis.py::test_insufficient_data_message
+  preconditions: 系統累積資料不滿3個月
+  action: GET /months/{yyyy-mm}/analysis
+  expected: 「與自己對比」區塊回傳「需要三個月資料，目前N個月」，不強行產生趨勢
+
+- id: TC-FUNC-ANALYSIS-002
+  req: REQ-ANALYSIS-007
+  category: FUNC
+  priority: P1
+  script: tests/api/test_analysis.py::test_suggestion_contains_quantified_amount
+  preconditions: 至少一個分類超出benchmark_pct上限
+  action: GET /months/{yyyy-mm}/analysis，檢視調整建議欄位
+  expected: 建議文字包含具體金額與分數換算，不出現「減少娛樂支出」這類無法量化的建議
+
+- id: TC-NEG-ANALYSIS-003
+  req: REQ-ANALYSIS-008
+  category: NEG
+  priority: P2
+  script: tests/api/test_analysis.py::test_no_moral_judgement_wording
+  preconditions: 某分類明顯超標（如樂類佔比遠高於基準）
+  action: 檢視分析文案內容
+  expected: 文案陳述事實與數字對比，不含「太多」「應該」等道德評價字眼
+
+# ============================================================
+# 模組：AUTH／NFR — 身份與存取、資料隔離
+# ============================================================
+
+- id: TC-SEC-AUTH-001
+  req: REQ-NFR-005
+  category: SEC
+  priority: P0
+  script: tests/api/test_auth_isolation.py::test_user_id_tampering_blocked
+  preconditions: Phase 3起，已有JWT機制；存在user_id=1與user_id=2兩組測試帳號
+  action: 使用user_id=1的token，將請求body或參數中的user_id竄改為2，嘗試讀寫資料
+  expected: HTTP 403，無法讀寫他人資料，即使初版僅單人使用仍須驗證此隔離機制
+
+- id: TC-SEC-AUTH-002
+  req: REQ-NFR-004
+  category: SEC
+  priority: P0
+  script: tests/api/test_error_handling.py::test_no_traceback_leak_in_prod
+  preconditions: DEBUG=false 環境
+  action: 觸發一個500錯誤（如傳入異常參數導致未捕捉例外）
+  expected: 回應內容不包含traceback或內部路徑資訊
+
+# ============================================================
+# 模組：E2E — 端到端流程（架構描述11.2 P0流程）
+# ============================================================
+
+- id: TC-E2E-001
+  req: REQ-EXPENSE-001
+  category: E2E
+  priority: P0
+  script: tests/e2e/test_expense_to_hp.py::test_record_expense_updates_home_hp
+  preconditions: 使用者已登入（或Phase0-2固定user_id=1），首頁已載入本週資料
+  action: 於首頁快速記帳表單新增一筆花費並送出
+  expected: 花費成功寫入並即時出現在本週逐日花費清單；首頁HP條與剩餘額度同步更新，不需整頁重整
+
+- id: TC-E2E-002
+  req: REQ-SETTLE-002
+  category: E2E
+  priority: P0
+  script: tests/e2e/test_settle_to_reward.py::test_settle_writes_reward_ledger
+  preconditions: 目標月份已結束，且該月尚未結算
+  action: 進入月結頁，點擊「執行月結」
+  expected: reward_ledger成功寫入一筆對應紀錄（含等級、獎勵金、分流），月結頁正確顯示結算結果
+
+# ============================================================
+# 版本記錄
+# ============================================================
+# v1.0 | 2026-09-16 | 首版產出，依SRS+FS v1.1與架構描述11.5高風險區，共67條測試條件，
+#                     涵蓋12個功能模組＋AUTH/NFR＋E2E；分類依rachel-qa TC格式
+#                     （AUTH/SEC/FUNC/UI/E2E/EDGE/NEG/PERF）；script路徑供Claude Code
+#                     產生對應測試檔，req欄回追SRS+FS v1.1的REQ編號

@@ -1,0 +1,53 @@
+# ===== 環境變數與密鑰（絕對不進版控）=====
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ===== Python / FastAPI =====
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+*.egg-info/
+dist/
+build/
+
+# ===== Node / Vite / React =====
+node_modules/
+frontend/dist/
+frontend/dev-dist/
+frontend/.vite/
+*.tsbuildinfo
+npm-debug.log*
+
+# ===== Playwright =====
+frontend/test-results/
+frontend/playwright-report/
+frontend/blob-report/
+
+# ===== QA 執行產物（只保留每個 Phase 驗收那份，手動 commit）=====
+qa/reports/*.json
+!qa/reports/phase*-final.json
+
+# ===== Docker / 資料庫本機資料 =====
+pgdata/
+*.sqlite
+*.db
+
+# ===== 編輯器與作業系統 =====
+.vscode/*
+!.vscode/settings.json
+!.vscode/extensions.json
+.idea/
+.DS_Store
+Thumbs.db
+
+# ===== Claude Code 個人設定（team 設定保留）=====
+.claude/settings.local.json

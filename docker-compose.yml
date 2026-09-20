@@ -1,0 +1,23 @@
+services:
+  db:
+    image: postgres:16
+    container_name: ledger-survivor-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ledger
+      POSTGRES_PASSWORD: ledger
+      POSTGRES_DB: ledger_survivor
+      TZ: ${TZ:-Asia/Taipei}
+      PGTZ: ${TZ:-Asia/Taipei}
+    ports:
+      - "${DB_PORT:-55432}:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ledger -d ledger_survivor"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  pgdata:

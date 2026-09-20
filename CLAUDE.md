@@ -54,18 +54,23 @@
 
 ## 常用指令（PowerShell）
 
-```powershell
-# 資料庫
-docker compose up -d db
+埠號說明：本機 5432 與 8000 已被另一專案（rachel-qa）佔用，所以 **DB 對外映射 55432、uvicorn 用 8765**；來源見 `.env.example`。容器內 PostgreSQL 仍是 5432。
 
-# 後端
-cd backend; uv sync; uv run alembic upgrade head; uv run uvicorn app.main:app --reload
+```powershell
+# 資料庫（對外埠 55432）
+docker compose up -d db
+docker compose exec -T db psql -U ledger -d ledger_survivor            # 進 psql；-T 讓非互動管線可用
+docker compose exec -T db psql -U ledger -d ledger_survivor -c "SELECT id, email FROM users;"
+
+# 後端（uvicorn 埠 8765）
+cd backend; uv sync; uv run alembic upgrade head
+uv run uvicorn app.main:app --reload --port 8765
 uv run pytest -q
 uv run pytest -q -m p0          # 只跑 P0
 
 # 前端
 cd frontend; npm install; npm run dev
-npm run gen:api                 # 從 http://localhost:8000/openapi.json 產生型別
+npm run gen:api                 # 從 http://localhost:8765/openapi.json 產生型別
 npm run test
 ```
 

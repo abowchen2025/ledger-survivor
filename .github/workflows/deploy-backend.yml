@@ -1,0 +1,104 @@
+# push main 時先跑完整後端測試（含一致性測試），通過後用 Railway CLI 觸發部署。
+# 需要的 GitHub Secrets / Variables（值不寫在這裡，清單見 README.md）：
+#   secrets.RAILWAY_TOKEN   Railway 專案 token（Project Settings → Tokens，綁定 production 環境）
+#   vars.RAILWAY_SERVICE    Railway 服務名稱；未設定時預設 "backend"
+name: Deploy backend (Railway)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "backend/**"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: railway-backend
+  cancel-in-progress: false
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  test:
+    name: full pytest before deploy
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ledger
+          POSTGRES_PASSWORD: ledger
+          POSTGRES_DB: ledger_survivor
+          TZ: Asia/Taipei
+          PGTZ: Asia/Taipei
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ledger -d ledger_survivor"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ledger:ledger@localhost:5432/ledger_survivor
+      TZ: Asia/Taipei
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node (for the consistency test)
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install backend dependencies
+        run: uv sync --frozen
+        working-directory: backend
+
+      - name: Alembic upgrade head + check
+        run: |
+          uv run alembic upgrade head
+          uv run alembic check
+        working-directory: backend
+
+      - name: pytest (all, incl. integration)
+        run: uv run pytest -q
+        working-directory: backend
+
+  deploy:
+    name: railway up
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
+      - name: Deploy backend/ to Railway
+        # railway up 會把 backend/ 目錄上傳並依 backend/railway.json（Dockerfile builder）建置
+        run: railway up --service "${{ vars.RAILWAY_SERVICE || 'backend' }}" --ci
+        working-directory: backend
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}

@@ -13,9 +13,10 @@
 
 ## 0. 先確認的事
 
-- [ ] **repo 是 private**（`gh repo view` 顯示 `isPrivate: true`）。GitHub **Free 方案的 private repo 不能用 GitHub Pages**，只有 public repo 或 Pro／Team／Enterprise 方案的 private repo 可以。二選一：
-  - 把 repo 改成 public（Settings → General → Danger Zone → Change visibility）。注意 `docs/` 內的規格文件與 `.env.example` 都會公開；repo 內沒有任何真實密鑰（`.env` 不進版控，`last4` 規則也還沒有資料）。
-  - 或升級 GitHub Pro（個人帳號，約 US$4/月）。
+- [ ] **把 repo 改成 public**（2026-09-21 ABow 決定，不升級 GitHub Pro）。GitHub Free 方案的 private repo 不能用 GitHub Pages；架構描述 10.1 本來就把「開源 + 贊助連結」列為優先路線，只是提前。
+  - 操作：https://github.com/abowchen2025/ledger-survivor/settings → 最下方「Danger Zone」→「Change repository visibility」→ Change to public → 依提示輸入 repo 名稱確認。
+  - 改之前確認 repo 內沒有機密：`.env` 被 gitignore（只有 `.env.example`）、token 只在 GitHub Secrets、seed 是通用分類、沒有任何個人財務資料。`git log -p | grep -i` 找 `password`／`token`／`secret` 應只出現在文件與範例。
+  - 驗證：`gh repo view --json isPrivate` 回 `false`；repo 首頁不再有「Private」標籤。
 - [ ] 帳號能登入 https://railway.com （GitHub 帳號登入即可）。Railway 目前免費試用額度用完後需要 Hobby 方案（US$5/月起，含 US$5 用量）。
 
 ---
@@ -102,6 +103,12 @@
 
 - [ ] Railway 右上頭像 → Account Settings → 「Usage」→「Usage Limits」：Hard limit 或 Alert 設 **US$10**（超過通知）。
 - [ ] 驗證：Usage 頁顯示已設定的門檻。
+
+### B7. 警告：部署環境只能放測試資料
+
+> **在 REQ-AUTH-000（臨時 API 金鑰閘門，`docs/spec-gaps.md` 第 5 節）實作完成之前，Railway 上的後端是公開網址、沒有任何認證，任何人拿到網址就能讀寫。**
+> 這段期間 Railway 環境只能用來驗證部署與 migration，**不要輸入任何真實花費資料**。Phase 1 開發期間用本機環境與假資料。
+> REQ-AUTH-000 完成後這則警告會改成「設定 `API_KEY`／`VITE_API_KEY`」的步驟。
 
 ---
 

@@ -33,6 +33,7 @@ asyncio_mode = "auto"
 markers = [
     "p0: P0 core tests, must pass before merge",
     "p1: P1 tests",
+    "integration: cross-language tests that need Node.js 22 + frontend/node_modules (npm ci)",
 ]
 # 只忽略下列兩個「來自第三方套件、與本專案程式碼無關」的 DeprecationWarning，
 # 以 message + 發出模組做最窄比對，不做全域 ignore::DeprecationWarning。

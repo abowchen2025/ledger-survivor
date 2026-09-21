@@ -1,0 +1,131 @@
+# CI：每個 PR 跑後端 pytest（含 PostgreSQL service container）、前端 vitest + build、
+# 前後端 week_rule 一致性測試（TC-SEC-WEEK-004）。P0 測試失敗擋合併（在 GitHub 分支保護規則
+# 把三個 job 設為 required check）。
+name: CI
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: "22"
+  PYTHON_VERSION: "3.12"
+
+jobs:
+  backend:
+    name: backend pytest (PostgreSQL 16)
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ledger
+          POSTGRES_PASSWORD: ledger
+          POSTGRES_DB: ledger_survivor
+          TZ: Asia/Taipei
+          PGTZ: Asia/Taipei
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ledger -d ledger_survivor"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      # CI 內 service container 直接映射 5432；本機才是 55432（見 .env.example）
+      DATABASE_URL: postgresql+psycopg://ledger:ledger@localhost:5432/ledger_survivor
+      TZ: Asia/Taipei
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install dependencies
+        run: uv sync --frozen
+
+      - name: Alembic upgrade head
+        run: uv run alembic upgrade head
+
+      - name: Alembic check (models vs migrations)
+        run: uv run alembic check
+
+      - name: pytest (unit + api)
+        # integration 由下方 consistency job 跑（需要 Node）
+        run: uv run pytest -q -m "not integration"
+
+  frontend:
+    name: frontend vitest + build
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Type check
+        run: npm run typecheck
+
+      - name: vitest (reads backend/tests/fixtures/week_cases.json)
+        run: npm run test
+
+      - name: Build (PWA manifest + service worker)
+        run: npm run build
+
+  consistency:
+    name: week_rule consistency (TC-SEC-WEEK-004)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Install backend dependencies
+        run: uv sync --frozen
+        working-directory: backend
+
+      - name: pytest tests/integration (frontend dump vs backend outputs)
+        run: uv run pytest -q tests/integration
+        working-directory: backend

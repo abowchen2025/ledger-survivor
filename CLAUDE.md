@@ -22,7 +22,8 @@
 - 測試條件 YAML 的 `script` 路徑**以 `backend/` 為根**：`tests/unit/`、`tests/api/`、`tests/integration/`、`tests/e2e/`（Playwright Python）
 - 測試檔命名帶 TC 編號可追溯，例：`tests/unit/test_week_rule.py::test_week_belongs_to_month_thursday_boundary` 對應 `TC-EDGE-WEEK-001`
 - `backend/tests/fixtures/week_cases.json` 是週歸屬規則的唯一真相，前端 `frontend/src/lib/week.test.ts` 也讀這份（相對路徑 `../../../backend/tests/fixtures/week_cases.json`）
-- CI 每個 PR 跑 pytest + vitest；P0 測試失敗擋合併
+- `tests/integration/test_week_rule_consistency.py`（TC-SEC-WEEK-004）用 subprocess 跑前端 `npm run week:dump`，比對兩端輸出而非各自對答案（`docs/adr/0005`）；標記 `integration`，需要 Node 22 與 `frontend/node_modules`，缺了會失敗不會 skip
+- CI（`.github/workflows/ci.yml`）每個 PR 跑 backend pytest（PostgreSQL service container）+ frontend vitest/build + 一致性測試；P0 測試失敗擋合併
 
 ## 核心規則（不可自行改動，動到要先問）
 
@@ -70,8 +71,10 @@ uv run pytest -q -m p0          # 只跑 P0
 
 # 前端
 cd frontend; npm install; npm run dev
-npm run gen:api                 # 從 http://localhost:8765/openapi.json 產生型別
+npm run gen:api                 # 從 http://127.0.0.1:8765/openapi.json 產生型別（寫 127.0.0.1 不寫 localhost：Node 會把 localhost 解析成 ::1，uvicorn 預設只綁 IPv4）
 npm run test
+npm run build                   # 產出 dist/（manifest.webmanifest、sw.js）
+npm run week:dump               # 一致性測試用：前端對 fixture 全部案例的輸出（JSON）
 ```
 
 ## 回報格式（每輪結束時）
@@ -97,4 +100,6 @@ npm run test
 
 ## 目前階段
 
-Phase 0a：後端骨架 + 資料表 + `week_rule` 通過測試。完成標準見 `docs/architecture_v2_2.md` 第 9 節。
+Phase 1：核心記帳（收入設定、信用卡主檔、花費 CRUD、首頁快速記帳、月曆）。完成標準見 `docs/architecture_v2_2.md` 第 9 節。
+
+已完成：Phase 0a（後端骨架、12 張表、seed、`week_rule` 測試）、Phase 0b（前端骨架六頁、PWA、前後端 `week_rule` 一致性測試 TC-SEC-WEEK-004、CI 三條 workflow、Dockerfile／railway.json、README）。路由方式 HashRouter 為提議狀態，見 `docs/adr/0004`。

@@ -13,12 +13,16 @@ WORKDIR /app
 
 # 先只裝相依套件（不裝專案本身），讓這一層在程式碼變動時仍可命中快取
 COPY pyproject.toml uv.lock ./
-RUN --mount=type=cache,target=/root/.cache/uv \
+# cache mount 一定要帶 id：Railway 的 builder 驗證 Dockerfile 時要求明確 id，缺少會直接報
+# "dockerfile invalid: flag '--mount=type=cache,...' is missing an id argument"。
+# 本機 Docker BuildKit 會自動推導 id 所以本機測不出來。兩個 RUN 用不同 id，避免互相覆蓋。不要拿掉。
+RUN --mount=type=cache,id=uv-cache-deps,target=/root/.cache/uv \
     uv sync --frozen --no-install-project --no-dev
 
 # 再放程式碼並安裝專案
 COPY . .
-RUN --mount=type=cache,target=/root/.cache/uv \
+# 同上：id 為 Railway builder 必要，且與上一個 cache mount 的 id 不同
+RUN --mount=type=cache,id=uv-cache-project,target=/root/.cache/uv \
     uv sync --frozen --no-dev
 
 # ---------- runtime ----------

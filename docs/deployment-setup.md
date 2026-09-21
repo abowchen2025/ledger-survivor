@@ -131,6 +131,7 @@
 | Pages 開得起來但點導覽沒反應／空白 | 瀏覽器快取到舊 service worker | 開發者工具 → Application → Service Workers → Unregister，重整；正式使用者不會遇到（`registerType: autoUpdate`） |
 | `railway up`：`Invalid RAILWAY_TOKEN` | Secret 未設、貼錯、或建立的是 Account token 而非 Project token、或 token 綁的環境不是 production | 重做 B4，確認在「專案 Settings → Tokens」建立 |
 | `railway up`：`Service not found` 或 `Multiple services found` | 服務名稱與 `backend` 不一致 | 改服務名稱為 `backend`，或設 GitHub Variable `RAILWAY_SERVICE` |
+| Railway build：`dockerfile invalid: flag '--mount=type=cache,target=...' is missing an id argument` | Railway 的 builder 驗證 Dockerfile 時要求 cache mount 帶明確 `id`；本機 Docker BuildKit 會自動推導所以本機 build 過、雲端失敗（2026-09-21 實際發生） | `backend/Dockerfile` 兩個 `--mount=type=cache` 都已帶 `id=`（`uv-cache-deps`、`uv-cache-project`），不要拿掉。凡是本機驗證過的部署設定都不能當作雲端也會過 |
 | Railway Deploy Logs：`ModuleNotFoundError: No module named 'psycopg2'` | `DATABASE_URL` 前綴是 `postgresql://` 而非 `postgresql+psycopg://` | 改 B3 的變數 |
 | Deploy Logs：`could not translate host name "postgres.railway.internal"` 或 `Connection refused` | Postgres 服務未就緒、或參照變數的服務名稱打錯、或兩個服務不在同一專案／環境 | 確認 Postgres 是綠色；Variables 頁把 `DATABASE_URL` 展開看解析後的值 |
 | Deploy Logs：`password authentication failed` | 參照到錯的變數（例如手抄了舊密碼） | B3 改用 `${{Postgres.PGPASSWORD}}` 參照，不要手抄 |

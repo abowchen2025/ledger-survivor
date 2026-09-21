@@ -58,7 +58,7 @@
 | 後端 | 讀環境變數 `API_KEY`；以 FastAPI dependency 檢查請求標頭 `X-API-Key`，套用到 `/api/v1` 下所有路由 | 條文 |
 | 失敗回應 | 標頭缺少或不符**一律** `401`，錯誤訊息固定同一句（例如 `{"detail": "unauthorized"}`），不透露「缺少」與「不符」的差異，避免用回應內容探測 | 條文 |
 | 豁免 | `GET /api/v1/health` 不檢查，讓 Railway healthcheck 能用 | 條文 |
-| 未設定 `API_KEY` | 環境變數缺少或為空時，後端啟動即失敗（fail closed），不得退化成「不檢查」 | 條文（ABow 未明寫，實作時採 fail closed；若要改為本機開發可關閉，需另設明確旗標） |
+| 未設定 `API_KEY` | 環境變數缺少或為空時，後端啟動即失敗（fail closed），不得退化成「不檢查」；**不設任何旁路旗標**，程式碼裡不存在「不檢查」的分支。本機開發由 `.env.example` 附一個開發用值（`API_KEY=dev-local-only-not-a-secret`），本機一樣走完整檢查路徑；前端 `.env.example` 對應 `VITE_API_KEY` 同值 | 條文（2026-09-21 ABow 確認 fail closed、無旁路旗標） |
 | 前端 | 建置期環境變數 `VITE_API_KEY`，所有對 `/api/v1` 的請求帶 `X-API-Key` | 條文 |
 | 金鑰存放 | GitHub Secrets（`VITE_API_KEY`，給 `deploy-frontend.yml` 建置用）與 Railway Variables（`API_KEY`），不進版控；`.env.example` 只列名稱 | README 與 deployment-setup 補步驟 |
 | 安全邊界（必須明寫） | 金鑰嵌在前端 build 產物裡，任何人打開 devtools 都看得到。它擋的是隨機掃描與爬蟲，不是針對性攻擊 | 條文加註 |

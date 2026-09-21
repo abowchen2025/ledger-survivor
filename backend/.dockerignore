@@ -1,0 +1,13 @@
+# 不進映像的東西：虛擬環境、快取、測試、本機環境檔
+.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+htmlcov/
+.coverage
+tests/
+.env
+.env.*
+*.md

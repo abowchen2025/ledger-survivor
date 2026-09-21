@@ -14,7 +14,7 @@
 - 前端 `frontend/`：React 18 + TypeScript + Vite + Zustand + Tailwind CSS + shadcn/ui + Recharts + vite-plugin-pwa → GitHub Pages
 - 後端 `backend/`：Python 3.12 + FastAPI + SQLAlchemy 2.x + Alembic → Railway
 - 資料庫：PostgreSQL 16；本機 `docker compose up -d db`，**不用 SQLite 替代**
-- API 前綴 `/api/v1`；前端型別由 OpenAPI 用 `openapi-typescript` 產生到 `frontend/src/api/schema.d.ts`，不手改
+- API 前綴 `/api/v1`；前端型別由 OpenAPI 用 `openapi-typescript` 產生到 `frontend/src/api/schema.d.ts`，不手改（來源網址用 `127.0.0.1:8765` 不用 `localhost`，原因見下方常用指令）
 - 時區固定 `Asia/Taipei`，日期欄位用 `DATE` 型別，不用 timestamp
 
 ## 測試佈局
@@ -71,7 +71,7 @@ uv run pytest -q -m p0          # 只跑 P0
 
 # 前端
 cd frontend; npm install; npm run dev
-npm run gen:api                 # 從 http://127.0.0.1:8765/openapi.json 產生型別（寫 127.0.0.1 不寫 localhost：Node 會把 localhost 解析成 ::1，uvicorn 預設只綁 IPv4）
+npm run gen:api                 # 從 http://127.0.0.1:8765/openapi.json 產生型別（一定寫 127.0.0.1，不要「順手」改回 localhost：Node 會把 localhost 解析成 IPv6 ::1，uvicorn 預設只綁 IPv4，會 ECONNREFUSED）
 npm run test
 npm run build                   # 產出 dist/（manifest.webmanifest、sw.js）
 npm run week:dump               # 一致性測試用：前端對 fixture 全部案例的輸出（JSON）

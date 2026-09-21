@@ -22,6 +22,8 @@ docs/        SRS+FS、測試條件、架構描述、ADR、spec-gaps
 
 前置：Docker Desktop、[uv](https://docs.astral.sh/uv/)、Node.js 22（含 npm）。
 
+> **npm 版本注意**：`frontend/package-lock.json` 由 `npm@latest`（12.x）產生，本機 npm 10.9.0 用 `npm ci` 安裝正常。若 `npm install` 失敗並出現 `Cannot read properties of null (reading 'edgesOut')`（npm 10.9.0 的 arborist 在解析 vitest 的 peer 相依時的已知 bug，堆疊在 `build-ideal-tree.js #loadPeerSet`），改用 `npx -y npm@latest install`，不必全域升級 npm。
+
 ```powershell
 # 0. 環境變數（.env 不進版控）
 Copy-Item .env.example .env

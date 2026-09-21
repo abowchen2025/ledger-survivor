@@ -58,7 +58,7 @@
 
 - [ ] 「+ Create」→「Empty Service」。點進去 → Settings → 「Service Name」改成 **`backend`**（要和 workflow 的 `--service "backend"` 一致；若取別的名字，B4 要另設 `RAILWAY_SERVICE` 變數）。
 - [ ] 同一個 Settings 頁確認 **Source** 區塊是空的（沒有連 GitHub repo）。
-- [ ] Settings → 「Networking」→「Public Networking」→ **Generate Domain**。會問 port，填 **8000**（Dockerfile `EXPOSE 8000`，啟動指令用 `${PORT:-8000}`；Railway 注入的 `PORT` 與這裡填的一致即可）。記下網址，形如 `backend-production-xxxx.up.railway.app`。
+- [ ] Settings → 「Networking」→「Public Networking」→ **Generate Domain**。會問 target port，填 **8080**（Railway 注入給容器的 `PORT` 環境變數是 8080，啟動指令 `uvicorn ... --port ${PORT:-8000}` 會聽 8080；Dockerfile 的 `EXPOSE 8000` 只是本機 docker run 的預設，與 Railway 無關）。**target port 必須等於 Deploy Logs 裡 `Uvicorn running on http://0.0.0.0:<埠>` 的埠號**，不一致會得到 502。2026-09-21 第一次填 8000 就是因此 502。記下網址，形如 `backend-production-xxxx.up.railway.app`。
 - [ ] 驗證：Settings 頁顯示 domain；此時服務還沒有任何 deployment，正常。
 - [ ] 記下服務 id：服務頁網址 `railway.com/project/<project id>/service/<service id>` 的最後一段。`backend/Dockerfile` 的 cache mount id 必須是 `s/<service id>-/root/.cache/uv`；目前寫的是 `374d7d08-9b81-47dd-9da9-23f4d73449ee`，若不一致要改 Dockerfile。
 
@@ -136,6 +136,7 @@
 | Railway Deploy Logs：`ModuleNotFoundError: No module named 'psycopg2'` | `DATABASE_URL` 前綴是 `postgresql://` 而非 `postgresql+psycopg://` | 改 B3 的變數 |
 | Deploy Logs：`could not translate host name "postgres.railway.internal"` 或 `Connection refused` | Postgres 服務未就緒、或參照變數的服務名稱打錯、或兩個服務不在同一專案／環境 | 確認 Postgres 是綠色；Variables 頁把 `DATABASE_URL` 展開看解析後的值 |
 | Deploy Logs：`password authentication failed` | 參照到錯的變數（例如手抄了舊密碼） | B3 改用 `${{Postgres.PGPASSWORD}}` 參照，不要手抄 |
+| 網域回 `502 {"message":"Application failed to respond"}`（header `x-railway-fallback: true`），但 Deployment 是 Active | 網域的 target port 與應用實際監聽的埠不一致：Railway 注入 `PORT=8080`，uvicorn 聽 8080，網域卻指到 8000 | 看 Deploy Logs 的 `Uvicorn running on http://0.0.0.0:<埠>`，到 Settings → Networking 把網域的 target port 改成同一個埠（B2 應填 8080）；不要在 Variables 手動設 `PORT` |
 | Deployment 一直 `Deploying` 然後 `Failed`，log 有 `Healthcheck failed` | 服務沒在 Railway 給的 `PORT` 上監聽；或 migration 失敗導致 uvicorn 沒起來 | 看 Deploy Logs 上方 alembic 那幾行有沒有 traceback；不要在 Variables 手動設 `PORT` |
 | `alembic upgrade head` 報 `UnicodeDecodeError` | 不會在 Linux 容器發生（那是 Windows cp950 問題）；若真的出現，把完整 log 貼回 | 回報 |
 | 每次 push main 部署兩次 | Railway 服務連了 GitHub repo，又有 Actions 部署 | B2：服務 Settings → Source → Disconnect |

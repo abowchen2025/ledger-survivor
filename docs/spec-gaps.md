@@ -46,4 +46,23 @@
 | 同上：`achievements` | `code VARCHAR(50)`、`unlocked_at TIMESTAMPTZ DEFAULT now()` | 補型別 |
 | 金額精度 | 所有金額 `NUMERIC(12,2)`，保留兩位小數（分期每期金額除不盡時用到） | 第三章加一句金額型別統一 `NUMERIC(12,2)` |
 
-小節編號對應 2026-09-20 回覆的第 1～4 點。
+### 5. 無認證期的臨時 API 金鑰閘門（REQ-AUTH-000，2026-09-21 ABow 決定；本輪只記錄，Phase 1 實作）
+
+**為什麼是規格缺口**：REQ-AUTH-* 排在 Phase 3。Phase 1～2 之間後端部署在 Railway 的公開網址上，沒有任何認證，而這段期間會用真實財務資料連續記帳。repo 改為 public（2026-09-21 決定，見架構描述 10.1）不改變這件事，只是讓網址更容易被找到。原規格漏掉了這段「無認證期」。
+
+**在 REQ-AUTH-000 實作完成之前，部署到 Railway 的環境只能放測試資料，不得輸入任何真實花費。Phase 1 開發期間用本機環境與假資料。**
+
+| 項目 | 規格（待實作） | 待 SRS 補述 |
+|---|---|---|
+| 編號／階段／優先 | `REQ-AUTH-000`，Phase 1，P0 | 4.x 認證模組（或第二章 RBAC）新增此條，放在 REQ-AUTH-001 之前，標註「臨時，Phase 3 移除」 |
+| 後端 | 讀環境變數 `API_KEY`；以 FastAPI dependency 檢查請求標頭 `X-API-Key`，套用到 `/api/v1` 下所有路由 | 條文 |
+| 失敗回應 | 標頭缺少或不符**一律** `401`，錯誤訊息固定同一句（例如 `{"detail": "unauthorized"}`），不透露「缺少」與「不符」的差異，避免用回應內容探測 | 條文 |
+| 豁免 | `GET /api/v1/health` 不檢查，讓 Railway healthcheck 能用 | 條文 |
+| 未設定 `API_KEY` | 環境變數缺少或為空時，後端啟動即失敗（fail closed），不得退化成「不檢查」 | 條文（ABow 未明寫，實作時採 fail closed；若要改為本機開發可關閉，需另設明確旗標） |
+| 前端 | 建置期環境變數 `VITE_API_KEY`，所有對 `/api/v1` 的請求帶 `X-API-Key` | 條文 |
+| 金鑰存放 | GitHub Secrets（`VITE_API_KEY`，給 `deploy-frontend.yml` 建置用）與 Railway Variables（`API_KEY`），不進版控；`.env.example` 只列名稱 | README 與 deployment-setup 補步驟 |
+| 安全邊界（必須明寫） | 金鑰嵌在前端 build 產物裡，任何人打開 devtools 都看得到。它擋的是隨機掃描與爬蟲，不是針對性攻擊 | 條文加註 |
+| 移除時機 | Phase 3 導入 JWT（REQ-AUTH-001 起）後整套移除：dependency、環境變數、前端標頭、相關 TC | 條文加註；Phase 3 的驗收條件加「REQ-AUTH-000 已移除」 |
+| 測試條件（建議） | `TC-SEC-AUTH-000a`：無 `X-API-Key` → 401；`TC-SEC-AUTH-000b`：錯誤金鑰 → 401 且回應 body 與 000a 完全相同；`TC-SEC-AUTH-000c`：正確金鑰 → 200；`TC-SEC-AUTH-000d`：`/api/v1/health` 無金鑰 → 200；`TC-SEC-AUTH-000e`：`API_KEY` 未設定 → 應用啟動失敗。script 建議 `tests/api/test_api_key_gate.py` | test_conditions 新增五條，req 回追 REQ-AUTH-000 |
+
+小節 1～4 對應 2026-09-20 回覆的第 1～4 點；小節 5 為 2026-09-21 新增。

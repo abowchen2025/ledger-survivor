@@ -1,0 +1,259 @@
+{
+  "$comment": "週歸屬規則唯一真相（REQ-WEEK-001／002）。前端 frontend/src/lib/week.test.ts 與後端 tests/unit/test_week_rule.py 都讀這份。定位是「規則真相表」而不是「測試案例清單」：測試除了依 tc 篩選，也會把全部案例逐筆跑過（test_all_cases_roundtrip），weeks_in_month 也是對所有案例驗證。每筆：date 為任一輸入日期；iso_year／iso_week 為其 ISO 週；belongs_month 為該週週四所在月份；week_start／week_end 為週一／週日；week_index_in_month 為該週在歸屬月的序號（1 起算）；weeks_in_month 為歸屬月依規則的週數；tc 為陣列，列出覆蓋的測試條件編號（同一筆常被多條 TC 用到）：TC-EDGE-WEEK-001 = 該週跨兩個日曆月（依週四歸屬）；TC-EDGE-WEEK-002 = date 本身的日曆月與歸屬月不同；TC-FUNC-WEEK-003 = 該歸屬月的週數樣本；TC-SEC-WEEK-004 = 前後端一致性（全部案例都屬於此 TC，不另標）。",
+  "cases": [
+    {
+      "date": "2026-09-28",
+      "iso_year": 2026,
+      "iso_week": 40,
+      "belongs_month": "2026-10",
+      "week_start": "2026-09-28",
+      "week_end": "2026-10-04",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002",
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "架構描述 3.1 範例：週一 9/28，週四 10/1，整週歸 10 月第 1 週；10 月為 5 週月"
+    },
+    {
+      "date": "2026-09-30",
+      "iso_year": 2026,
+      "iso_week": 40,
+      "belongs_month": "2026-10",
+      "week_start": "2026-09-28",
+      "week_end": "2026-10-04",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002"
+      ],
+      "note": "同一週的週三（9 月最後一天），仍歸 10 月"
+    },
+    {
+      "date": "2026-10-01",
+      "iso_year": 2026,
+      "iso_week": 40,
+      "belongs_month": "2026-10",
+      "week_start": "2026-09-28",
+      "week_end": "2026-10-04",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001"
+      ],
+      "note": "週四本身落在月初第一天"
+    },
+    {
+      "date": "2026-10-04",
+      "iso_year": 2026,
+      "iso_week": 40,
+      "belongs_month": "2026-10",
+      "week_start": "2026-09-28",
+      "week_end": "2026-10-04",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001"
+      ],
+      "note": "同一週的週日"
+    },
+    {
+      "date": "2026-08-31",
+      "iso_year": 2026,
+      "iso_week": 36,
+      "belongs_month": "2026-09",
+      "week_start": "2026-08-31",
+      "week_end": "2026-09-06",
+      "week_index_in_month": 1,
+      "weeks_in_month": 4,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002",
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "架構描述 3.1 範例：週一 8/31，週四 9/3，整週歸 9 月第 1 週；9 月為 4 週月"
+    },
+    {
+      "date": "2026-09-06",
+      "iso_year": 2026,
+      "iso_week": 36,
+      "belongs_month": "2026-09",
+      "week_start": "2026-08-31",
+      "week_end": "2026-09-06",
+      "week_index_in_month": 1,
+      "weeks_in_month": 4,
+      "tc": [
+        "TC-EDGE-WEEK-001"
+      ],
+      "note": "同一週的週日"
+    },
+    {
+      "date": "2026-09-24",
+      "iso_year": 2026,
+      "iso_week": 39,
+      "belongs_month": "2026-09",
+      "week_start": "2026-09-21",
+      "week_end": "2026-09-27",
+      "week_index_in_month": 4,
+      "weeks_in_month": 4,
+      "tc": [
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "9 月最後一週（第 4 週），整週都在 9 月內"
+    },
+    {
+      "date": "2026-10-29",
+      "iso_year": 2026,
+      "iso_week": 44,
+      "belongs_month": "2026-10",
+      "week_start": "2026-10-26",
+      "week_end": "2026-11-01",
+      "week_index_in_month": 5,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "10 月第 5 週；週日 11/1 落在下個月，但週四 10/29 決定歸 10 月"
+    },
+    {
+      "date": "2026-12-28",
+      "iso_year": 2026,
+      "iso_week": 53,
+      "belongs_month": "2026-12",
+      "week_start": "2026-12-28",
+      "week_end": "2027-01-03",
+      "week_index_in_month": 5,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "跨年週：週一 12/28、週四 12/31、週日 2027/1/3；ISO 2026-W53，依規則歸 2026-12（第 5 週），不是 2027-01；2026 是 ISO 53 週年"
+    },
+    {
+      "date": "2027-01-02",
+      "iso_year": 2026,
+      "iso_week": 53,
+      "belongs_month": "2026-12",
+      "week_start": "2026-12-28",
+      "week_end": "2027-01-03",
+      "week_index_in_month": 5,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002"
+      ],
+      "note": "反向案例：日曆年 2027、ISO 年 2026（ISO 2026-W53），整週歸 2026-12；日曆年與 ISO 年不同"
+    },
+    {
+      "date": "2027-01-04",
+      "iso_year": 2027,
+      "iso_week": 1,
+      "belongs_month": "2027-01",
+      "week_start": "2027-01-04",
+      "week_end": "2027-01-10",
+      "week_index_in_month": 1,
+      "weeks_in_month": 4,
+      "tc": [
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "2027 年第一個完整週，1 月第 1 週；2027-01 為 4 週月"
+    },
+    {
+      "date": "2025-12-29",
+      "iso_year": 2026,
+      "iso_week": 1,
+      "belongs_month": "2026-01",
+      "week_start": "2025-12-29",
+      "week_end": "2026-01-04",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002",
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "跨年歸次年：週一 2025/12/29，週四 2026/1/1，整週歸 2026-01 第 1 週；日曆年 2025 與 ISO 年 2026 不同（ISO 2026-W01）；2026-01 為 5 週月，weeks_in_month 已含此週"
+    },
+    {
+      "date": "2025-12-31",
+      "iso_year": 2026,
+      "iso_week": 1,
+      "belongs_month": "2026-01",
+      "week_start": "2025-12-29",
+      "week_end": "2026-01-04",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002"
+      ],
+      "note": "日曆年 2025、ISO 年 2026、歸屬 2026-01；日曆年與 ISO 年不同"
+    },
+    {
+      "date": "2028-02-28",
+      "iso_year": 2028,
+      "iso_week": 9,
+      "belongs_month": "2028-03",
+      "week_start": "2028-02-28",
+      "week_end": "2028-03-05",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002",
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "閏年 2 月邊界：週一 2/28、週二 2/29、週四 3/2，整週歸 2028-03 第 1 週；2028-03 為 5 週月"
+    },
+    {
+      "date": "2028-02-29",
+      "iso_year": 2028,
+      "iso_week": 9,
+      "belongs_month": "2028-03",
+      "week_start": "2028-02-28",
+      "week_end": "2028-03-05",
+      "week_index_in_month": 1,
+      "weeks_in_month": 5,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002"
+      ],
+      "note": "2 月 29 日本身歸 3 月"
+    },
+    {
+      "date": "2027-02-28",
+      "iso_year": 2027,
+      "iso_week": 8,
+      "belongs_month": "2027-02",
+      "week_start": "2027-02-22",
+      "week_end": "2027-02-28",
+      "week_index_in_month": 4,
+      "weeks_in_month": 4,
+      "tc": [
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "平年 2 月 28 日剛好是週日，週四 2/25，2 月第 4 週；2027-02 為 4 週月"
+    },
+    {
+      "date": "2026-03-01",
+      "iso_year": 2026,
+      "iso_week": 9,
+      "belongs_month": "2026-02",
+      "week_start": "2026-02-23",
+      "week_end": "2026-03-01",
+      "week_index_in_month": 4,
+      "weeks_in_month": 4,
+      "tc": [
+        "TC-EDGE-WEEK-001",
+        "TC-EDGE-WEEK-002",
+        "TC-FUNC-WEEK-003"
+      ],
+      "note": "3/1 是週日，週四 2/26，整週歸 2026-02 第 4 週（往前歸屬）"
+    }
+  ]
+}

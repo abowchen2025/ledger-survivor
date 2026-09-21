@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session, sessionmaker
 
 from app.config import settings
 
-engine = create_engine(settings.database_url, echo=settings.debug, pool_pre_ping=True)
+# connect_timeout：DB 連不上時 5 秒內失敗。沒有它，Windows／某些網路會等 TCP 逾時（實測 2 分鐘），
+# /health/ready 會卡住，Railway healthcheck 也會誤判。
+engine = create_engine(
+    settings.database_url,
+    echo=settings.debug,
+    pool_pre_ping=True,
+    connect_args={"connect_timeout": 5},
+)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False, expire_on_commit=False)
 
 

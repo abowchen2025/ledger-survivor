@@ -1,5 +1,5 @@
 # syntax=docker/dockerfile:1.7
-# 後端映像（Railway 用 backend/railway.json 指到這份 Dockerfile）。
+# 後端映像（Railway 服務以 Dockerfile builder 建置；部署設定在 Railway UI，見 docs/deployment-setup.md）。
 # 兩階段：builder 用 uv 依 uv.lock 建 .venv；runtime 只帶 .venv 與程式碼，不帶 uv 與 dev 套件。
 
 # ---------- builder ----------
@@ -47,6 +47,7 @@ USER app
 
 EXPOSE 8000
 
-# Railway 以 PORT 環境變數指定對外埠；本機 docker run 沒設就用 8000。
-# Migration 由 railway.json 的 startCommand 在啟動前執行；這裡的 CMD 只給本機 docker run 用。
+# 這是唯一的啟動來源（Railway 的 config-as-code 對本服務不可用，見 docs/adr/0006）：只起 uvicorn。
+# Railway 注入 PORT（目前 8080）；本機 docker run 沒設就用 8000。
+# Migration 不在這裡跑：由 Railway UI 的 pre-deploy step（alembic upgrade head）在切流量前執行一次。
 CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

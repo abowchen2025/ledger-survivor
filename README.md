@@ -12,7 +12,7 @@
 ## 目錄
 
 ```
-backend/     FastAPI、SQLAlchemy models、Alembic migrations、pytest、Dockerfile、railway.json
+backend/     FastAPI、SQLAlchemy models、Alembic migrations、pytest、Dockerfile
 frontend/    Vite + React PWA、vitest
 docs/        SRS+FS、測試條件、架構描述、ADR、spec-gaps
 .github/     CI 與部署 workflow
@@ -36,7 +36,7 @@ cd backend
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8765
-# 另開一個終端機驗證：Invoke-RestMethod http://localhost:8765/api/v1/health
+# 另開一個終端機驗證：Invoke-RestMethod http://localhost:8765/api/v1/health/ready   # DB 可連且 migration 到 head 才 200
 
 # 3. 前端（開發網址 http://localhost:5173/ledger-survivor/）
 cd ..\frontend
@@ -89,7 +89,7 @@ npm run gen:api       # → src/api/schema.d.ts，不要手改
 |---|---|---|
 | `ci.yml` | PR、push main | `backend`：PostgreSQL 16 service container + alembic upgrade/check + pytest；`frontend`：typecheck + vitest + build；`consistency`：Node + uv，跑 `tests/integration` |
 | `deploy-frontend.yml` | push main（frontend/** 或 fixture 變動） | build 後以 `actions/deploy-pages` 部署到 GitHub Pages |
-| `deploy-backend.yml` | push main（backend/** 變動） | 完整 pytest（含一致性）通過後 `railway up` 部署 `backend/` |
+| `deploy-backend.yml` | push main（backend/** 變動） | 完整 pytest（含一致性）通過後 `railway up` 部署 `backend/`；migration 由 Railway pre-deploy step 執行 |
 
 分支保護建議把 `ci.yml` 的三個 job 設為 required check（P0 測試失敗擋合併）。
 
@@ -112,7 +112,7 @@ npm run gen:api       # → src/api/schema.d.ts，不要手改
 | `DEBUG` | `false` |
 | `PORT` | Railway 自動注入，不用手設 |
 
-啟動指令在 `backend/railway.json`：先 `alembic upgrade head` 再起 uvicorn；健康檢查路徑 `/api/v1/health`。
+啟動指令是 Dockerfile 的 `CMD`（只起 uvicorn）。Migration 由 Railway UI 的 **pre-deploy step** `alembic upgrade head` 在切流量前跑一次；Healthcheck Path 設 `/api/v1/health/ready`（DB 可連且 migration 已到 head 才回 200）。這兩項只能在 Railway UI 設定，`railway.json` 對本服務無效（config-as-code 已於 2026-08-28 對新服務關閉），細節與還原清單見 `docs/deployment-setup.md`、`docs/adr/0006`。
 
 ## 本機用 Docker 跑後端映像（選用）
 

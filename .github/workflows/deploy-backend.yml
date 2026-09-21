@@ -97,7 +97,8 @@ jobs:
         run: npm install -g @railway/cli
 
       - name: Deploy backend/ to Railway
-        # railway up 會把 backend/ 目錄上傳並依 backend/railway.json（Dockerfile builder）建置
+        # railway up 會把 backend/ 目錄上傳，Railway 以 Dockerfile builder 建置；
+        # 啟動指令、pre-deploy migration、healthcheck 都設定在 Railway UI（config-as-code 對本服務不可用）
         run: railway up --service "${{ vars.RAILWAY_SERVICE || 'backend' }}" --ci
         working-directory: backend
         env:

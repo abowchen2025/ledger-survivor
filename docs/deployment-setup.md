@@ -32,6 +32,8 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
 | Variables | `API_KEY` | （REQ-AUTH-000 實作後才加） | |
 | 專案 Settings → Tokens | Project token（production） | 值放 GitHub Secret `RAILWAY_TOKEN` | |
 
+**表中所有值填完都要按畫布右上角「Deploy」套用才生效**：Railway 新版畫布會把 UI 改動暫存為「Apply N changes」，沒按 Deploy 等於沒設。
+
 另外 `backend/Dockerfile` 的 cache mount id 綁 service id（`s/<service id>-/root/.cache/uv`），服務重建後 id 會變，Dockerfile 要跟著改。
 
 ---
@@ -77,6 +79,7 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
 
 - [ ] https://railway.com/new → 「Empty Project」。建好後左上角把專案名稱改成 `ledger-survivor`（Project Settings → General）。
 - [ ] 專案畫布上「+ Create」→「Database」→「Add PostgreSQL」。等它變成綠色（Deployed）。
+- [ ] **按畫布右上角「Deploy」套用並等待完成**：Railway 新版畫布把 UI 改動先暫存為左上角「Apply N changes」，沒按 Deploy 就完全不會寫入（2026-09-21 兩次踩到：服務名稱與 pre-deploy 都曾停在待套用狀態）。
 - [ ] 驗證：點 Postgres 服務 → 「Variables」分頁看得到 `PGHOST`、`PGUSER`、`PGPASSWORD`、`PGDATABASE`、`DATABASE_URL`、`RAILWAY_PRIVATE_DOMAIN` 等變數。**不用**複製這些值，下一步用參照。
 
 ### B2. 建後端服務（Empty Service）
@@ -84,6 +87,7 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
 - [ ] 「+ Create」→「Empty Service」。點進去 → Settings → 「Service Name」改成 **`backend`**（要和 workflow 的 `--service "backend"` 一致；若取別的名字，B4 要另設 `RAILWAY_SERVICE` 變數）。
 - [ ] 同一個 Settings 頁確認 **Source** 區塊是空的（沒有連 GitHub repo）。
 - [ ] Settings → 「Networking」→「Public Networking」→ **Generate Domain**。會問 target port，填 **8080**（Railway 注入給容器的 `PORT` 環境變數是 8080，啟動指令 `uvicorn ... --port ${PORT:-8000}` 會聽 8080；Dockerfile 的 `EXPOSE 8000` 只是本機 docker run 的預設，與 Railway 無關）。**target port 必須等於 Deploy Logs 裡 `Uvicorn running on http://0.0.0.0:<埠>` 的埠號**，不一致會得到 502。2026-09-21 第一次填 8000 就是因此 502。記下網址，形如 `backend-production-xxxx.up.railway.app`。
+- [ ] **按畫布右上角「Deploy」套用並等待完成**：Railway 新版畫布把 UI 改動先暫存為左上角「Apply N changes」，沒按 Deploy 就完全不會寫入（2026-09-21 兩次踩到：服務名稱與 pre-deploy 都曾停在待套用狀態）。
 - [ ] 驗證：Settings 頁顯示 domain；此時服務還沒有任何 deployment，正常。
 - [ ] 記下服務 id：服務頁網址 `railway.com/project/<project id>/service/<service id>` 的最後一段。`backend/Dockerfile` 的 cache mount id 必須是 `s/<service id>-/root/.cache/uv`；目前寫的是 `374d7d08-9b81-47dd-9da9-23f4d73449ee`，若不一致要改 Dockerfile。
 
@@ -101,6 +105,7 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
   - 前綴一定是 `postgresql+psycopg://`。Postgres 服務自己提供的 `DATABASE_URL` 是 `postgresql://`，SQLAlchemy 會去找 psycopg2，映像裡沒有，會啟動失敗。
   - 用 `RAILWAY_PRIVATE_DOMAIN`（內網），不走公網 `PGHOST`，免費且較快。
   - `PORT` 不用設，Railway 自動注入。
+- [ ] **按畫布右上角「Deploy」套用並等待完成**：Railway 新版畫布把 UI 改動先暫存為左上角「Apply N changes」，沒按 Deploy 就完全不會寫入（2026-09-21 兩次踩到：服務名稱與 pre-deploy 都曾停在待套用狀態）。
 - [ ] 驗證：Variables 分頁看到三個變數，`DATABASE_URL` 的值顯示為已解析的連線字串（滑鼠移過去會展開）。
 
 ### B3b. 設定 Deploy：pre-deploy migration 與 healthcheck（只能在 UI 設）
@@ -110,6 +115,7 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
 - [ ] `backend` 服務 → Settings → Deploy → 「Custom Start Command」**保持空白**（用 Dockerfile 的 `CMD`，只起 uvicorn）。
 - [ ] 同一頁 → 「Pre-deploy Command」（Add pre-deploy step）填 **`alembic upgrade head`**。Railway 會在每次部署時，用同一份映像、同一組變數，先在獨立容器跑這行；失敗則整個部署失敗、舊版繼續服務、新容器不啟動。
 - [ ] 同一頁 → 「Healthcheck Path」填 **`/api/v1/health/ready`**。這個端點要 DB 可連且 `alembic_version` 等於程式碼 head 才回 200，否則 503；Railway 會等它 200 才切流量。Timeout 用預設。
+- [ ] **按畫布右上角「Deploy」套用並等待完成**：Railway 新版畫布把 UI 改動先暫存為左上角「Apply N changes」，沒按 Deploy 就完全不會寫入（2026-09-21 兩次踩到：服務名稱與 pre-deploy 都曾停在待套用狀態）。
 - [ ] 驗證：Settings → Deploy 頁面三個欄位分別顯示：空白、`alembic upgrade head`、`/api/v1/health/ready`。
 - [ ] 設完後到 Deployments → 最新一筆右側「⋯」→ **Redeploy**（設定變更不會自動觸發部署），或到 GitHub Actions 手動 Run `Deploy backend (Railway)`。
 
@@ -173,6 +179,7 @@ Railway 目前是 **Trial 方案**：一次性 US$5 額度、**沒有用量警�
 | Railway build：`dockerfile invalid: flag '--mount=type=cache,target=...' is missing an id argument` | Railway 的 builder 驗證 Dockerfile 時要求 cache mount 帶明確 `id`；本機 Docker BuildKit 會自動推導所以本機 build 過、雲端失敗（2026-09-21 實際發生） | `backend/Dockerfile` 兩個 `--mount=type=cache` 都已帶 Railway 規定格式的 `id=s/<service id>-/root/.cache/uv`（任意字串如 `uv-cache-deps` 也會被擋，2026-09-21 第二次失敗就是這樣）。**若在 Railway 重建 backend 服務，service id 會變，Dockerfile 要跟著改**。凡是本機驗證過的部署設定都不能當作雲端也會過 |
 | `/api/v1/health` 回 200，但 Postgres Data 分頁「You have no tables」；Deploy Logs 沒有任何 alembic 字樣 | migration 從未執行：Pre-deploy Command 沒設，或以為 `railway.json` 會生效（本服務不讀 config-as-code） | 做 B3b 在 UI 設 `alembic upgrade head`，Redeploy；用 `/api/v1/health/ready` 驗證（會回 503 `db_revision: null` 直到 migration 跑完） |
 | `/api/v1/health/ready` 回 503 `{"status":"degraded"}` | `checks.db` 為 `error`：連不到 DB（變數、私網、Postgres 未就緒）；`db` 為 `ok` 但 `migration.ok` 為 false：`db_revision` 是 null 表示沒跑過 migration，是舊值表示 pre-deploy 失敗或被跳過 | 前者查 B3 變數；後者看 Deploy Logs 的 pre-deploy 段落與 B3b 設定 |
+| 在 Railway UI 設定後完全沒有作用（服務名稱沒改、pre-deploy 沒跑、變數沒進去、`railway up` 回 404 找不到服務） | 新版畫布的待套用機制：改動停在畫布左上角「Apply N changes」，尚未寫入 | 看畫布左上角是否顯示「Apply N changes」，按右上角「Deploy」套用並等待完成，再重跑部署 |
 | Railway Deploy Logs：`ModuleNotFoundError: No module named 'psycopg2'` | `DATABASE_URL` 前綴是 `postgresql://` 而非 `postgresql+psycopg://` | 改 B3 的變數 |
 | Deploy Logs：`could not translate host name "postgres.railway.internal"` 或 `Connection refused` | Postgres 服務未就緒、或參照變數的服務名稱打錯、或兩個服務不在同一專案／環境 | 確認 Postgres 是綠色；Variables 頁把 `DATABASE_URL` 展開看解析後的值 |
 | Deploy Logs：`password authentication failed` | 參照到錯的變數（例如手抄了舊密碼） | B3 改用 `${{Postgres.PGPASSWORD}}` 參照，不要手抄 |

@@ -65,4 +65,19 @@
 | 移除時機 | Phase 3 導入 JWT（REQ-AUTH-001 起）後整套移除：dependency、環境變數、前端標頭、相關 TC | 條文加註；Phase 3 的驗收條件加「REQ-AUTH-000 已移除」 |
 | 測試條件（建議） | `TC-SEC-AUTH-000a`：無 `X-API-Key` → 401；`TC-SEC-AUTH-000b`：錯誤金鑰 → 401 且回應 body 與 000a 完全相同；`TC-SEC-AUTH-000c`：正確金鑰 → 200；`TC-SEC-AUTH-000d`：`/api/v1/health` 無金鑰 → 200；`TC-SEC-AUTH-000e`：`API_KEY` 未設定 → 應用啟動失敗。script 建議 `tests/api/test_api_key_gate.py` | test_conditions 新增五條，req 回追 REQ-AUTH-000 |
 
-小節 1～4 對應 2026-09-20 回覆的第 1～4 點；小節 5 為 2026-09-21 新增。
+### 6. 健康檢查端點（REQ-NFR-008，2026-09-21 ABow 決定；已實作於 Phase 0b 收尾）
+
+**為什麼是規格缺口**：健康檢查現在是部署的守門員（Railway healthcheck 指向它，決定新版本是否切流量），是有行為、可測試的需求，不該只活在程式碼裡。SRS 目前沒有任何條文定義 health 端點。決策理由見 `docs/adr/0006`。
+
+| 項目 | 目前實作 | 待 SRS 補述 |
+|---|---|---|
+| 編號／階段／優先 | `REQ-NFR-008`，Phase 0，P0 | 第五章 5.2 新增此列 |
+| `GET /api/v1/health` | 固定 `200 {"status":"ok"}`，不查依賴（維持既有行為，Phase 0 驗收「Railway /health 回 200」指向它） | 條文 |
+| `GET /api/v1/health/live` | liveness：固定 `200 {"status":"ok"}`，不查任何依賴。DB 斷線時不得回非 200（容器重啟解決不了 DB 問題） | 條文 |
+| `GET /api/v1/health/ready` | readiness：連一次 DB 並讀 `alembic_version`。DB 可連且 `version_num` 等於程式碼 head → `200 {"status":"ok","checks":{"db":"ok","migration":{"ok":true,"db_revision":"<rev>","code_head":"<rev>"}}}`；否則 `503 {"status":"degraded","checks":{"db":"ok"|"error","migration":{"ok":false,"db_revision":<rev 或 null>,"code_head":"<rev>"}}}`。`alembic_version` 表不存在（migration 從未跑）視為 `db:"ok"`、`db_revision:null` | 條文與回應格式 |
+| 不洩漏 | readiness 回應不得含連線字串、主機、帳號、例外文字；細節只寫伺服器 log | 條文（呼應 REQ-NFR-004） |
+| 逾時 | DB 連線逾時 5 秒（engine `connect_timeout=5`），readiness 最慢約 5 秒回 503，不得無限等 | 條文 |
+| 部署綁定 | Railway Healthcheck Path 指向 `/api/v1/health/ready`；migration 沒跑或跑失敗的部署不得切流量 | 條文；架構描述第 9 節 Phase 0 驗收「Railway /health 回 200」改為「/health/ready 回 200」 |
+| 測試條件（已實作於 `tests/api/test_health.py`） | `TC-FUNC-HEALTH-001` live 在 DB 不可達時仍 200；`002` ready 在 DB 到 head 時 200 且 `db_revision == code_head`；`003` revision 不符 → 503 degraded、`migration.ok=false`；`004` DB 不可達 → 503、`checks.db=error`、回應不含連線細節；`005` `/health` 維持 `{"status":"ok"}` | test_conditions 新增五條，req 回追 REQ-NFR-008 |
+
+小節 1～4 對應 2026-09-20 回覆的第 1～4 點；小節 5～6 為 2026-09-21 新增。

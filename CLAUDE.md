@@ -23,6 +23,8 @@
 - 測試檔命名帶 TC 編號可追溯，例：`tests/unit/test_week_rule.py::test_week_belongs_to_month_thursday_boundary` 對應 `TC-EDGE-WEEK-001`
 - `backend/tests/fixtures/week_cases.json` 是週歸屬規則的唯一真相，前端 `frontend/src/lib/week.test.ts` 也讀這份（相對路徑 `../../../backend/tests/fixtures/week_cases.json`）
 - `tests/integration/test_week_rule_consistency.py`（TC-SEC-WEEK-004）用 subprocess 跑前端 `npm run week:dump`，比對兩端輸出而非各自對答案（`docs/adr/0005`）；標記 `integration`，需要 Node 22 與 `frontend/node_modules`，缺了會失敗不會 skip
+- `tests/api/test_health.py` 的 `/health/ready` 正常路徑需要本機 DB 已 `alembic upgrade head`；DB 不可用會失敗不會 skip。健康檢查三端點規格見 `docs/spec-gaps.md` 第 6 節（REQ-NFR-008）、`docs/adr/0006`
+- 雲端部署設定（pre-deploy `alembic upgrade head`、Healthcheck Path `/api/v1/health/ready`、target port 8080）只存在 Railway UI，`railway.json` 對本服務無效且已刪除；清單見 `docs/deployment-setup.md` 開頭
 - CI（`.github/workflows/ci.yml`）每個 PR 跑 backend pytest（PostgreSQL service container）+ frontend vitest/build + 一致性測試；P0 測試失敗擋合併
 
 ## 核心規則（不可自行改動，動到要先問）

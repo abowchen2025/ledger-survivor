@@ -7,7 +7,7 @@
 - 資料庫：PostgreSQL 16（本機用 Docker Compose，不用 SQLite）
 - 時區固定 `Asia/Taipei`，日期欄位用 `DATE`
 
-規格與決策文件在 `docs/`（`srs_fs_v1_2.md`、`test_conditions_v1_0.yaml`、`architecture_v2_2.md`、`adr/`），開發規範在 `CLAUDE.md`。
+規格與決策文件在 `docs/`（`srs_fs_v1_2.md`、`test_conditions_v1_1.yaml`、`architecture_v2_2.md`、`adr/`），開發規範在 `CLAUDE.md`。
 
 ## 目錄
 
@@ -25,8 +25,9 @@ docs/        SRS+FS、測試條件、架構描述、ADR、spec-gaps
 > **npm 版本注意**：`frontend/package-lock.json` 由 `npm@latest`（12.x）產生，本機 npm 10.9.0 用 `npm ci` 安裝正常。若 `npm install` 失敗並出現 `Cannot read properties of null (reading 'edgesOut')`（npm 10.9.0 的 arborist 在解析 vitest 的 peer 相依時的已知 bug，堆疊在 `build-ideal-tree.js #loadPeerSet`），改用 `npx -y npm@latest install`，不必全域升級 npm。
 
 ```powershell
-# 0. 環境變數（.env 不進版控）
-Copy-Item .env.example .env
+# 0. 環境變數（.env 不進版控；兩份都要）
+Copy-Item .env.example .env                      # 後端：DATABASE_URL、API_KEY、CORS_ALLOWED_ORIGINS
+Copy-Item frontend\.env.example frontend\.env    # 前端：VITE_API_BASE_URL、VITE_API_KEY（與後端 API_KEY 相同）
 
 # 1. 資料庫（對外埠 55432）
 docker compose up -d db
@@ -36,7 +37,10 @@ cd backend
 uv sync
 uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8765
-# 另開一個終端機驗證：Invoke-RestMethod http://localhost:8765/api/v1/health/ready   # DB 可連且 migration 到 head 才 200
+# 另開一個終端機驗證：Invoke-RestMethod http://localhost:8765/api/v1/health/ready   # DB 可連且 migration 到 head 才 200（不需金鑰）
+# 受保護端點要帶金鑰（REQ-AUTH-000）：
+#   Invoke-RestMethod http://localhost:8765/api/v1/auth/me -Headers @{ "X-API-Key" = "dev-local-only-not-a-secret" }   # {"user_id":1}
+#   不帶或帶錯 → 401 {"detail":"unauthorized"}；API_KEY 未設定 → uvicorn 啟動失敗（fail closed，沒有旁路旗標）
 
 # 3. 前端（開發網址 http://localhost:5173/ledger-survivor/）
 cd ..\frontend
@@ -88,7 +92,7 @@ npm run gen:api       # → src/api/schema.d.ts，不要手改
 | Workflow | 觸發 | 內容 |
 |---|---|---|
 | `ci.yml` | PR、push main | `backend`：PostgreSQL 16 service container + alembic upgrade/check + pytest；`frontend`：typecheck + vitest + build；`consistency`：Node + uv，跑 `tests/integration` |
-| `deploy-frontend.yml` | push main（frontend/** 或 fixture 變動） | build 後以 `actions/deploy-pages` 部署到 GitHub Pages |
+| `deploy-frontend.yml` | push main（frontend/** 或 fixture 變動） | 檢查兩個 `VITE_*` Secret 已設定（缺了 build 失敗）→ build → `actions/deploy-pages` 部署到 GitHub Pages |
 | `deploy-backend.yml` | push main（backend/** 變動） | 完整 pytest（含一致性）通過後 `railway up` 部署 `backend/`；migration 由 Railway pre-deploy step 執行 |
 
 分支保護建議把 `ci.yml` 的三個 job 設為 required check（P0 測試失敗擋合併）。
@@ -98,10 +102,12 @@ npm run gen:api       # → src/api/schema.d.ts，不要手改
 | 類型 | 名稱 | 用途 | 從哪裡取得 |
 |---|---|---|---|
 | Secret | `RAILWAY_TOKEN` | `deploy-backend.yml` 用 Railway CLI 部署 | Railway → 專案 → Settings → Tokens，建立綁定 production 環境的 **project token** |
+| Secret | `VITE_API_BASE_URL` | `deploy-frontend.yml` 建置時注入前端要打的後端網址 | Railway backend 服務的 public domain，只到 host，例如 `https://backend-production-xxxx.up.railway.app`（不含 `/api/v1`、不含結尾 `/`） |
+| Secret | `VITE_API_KEY` | `deploy-frontend.yml` 建置時嵌進前端的 `X-API-Key` 值 | 自己產生一串隨機值（例如 `openssl rand -hex 32`），**與 Railway Variables 的 `API_KEY` 相同** |
 | Variable（選填） | `RAILWAY_SERVICE` | Railway 服務名稱；未設定時用 `backend` | Railway 專案內的服務名稱 |
 | Repo 設定 | Pages → Source = **GitHub Actions** | `deploy-frontend.yml` 需要 | Settings → Pages |
 
-值一律不寫進 repo。GitHub Pages 部署不需要任何 Secret（用 OIDC `id-token`）。
+值一律不寫進 repo。GitHub Pages 的部署動作本身用 OIDC `id-token`，不需要 Secret；兩個 `VITE_*` Secret 是給 **build** 用的。
 
 ### Railway 服務需要的環境變數
 
@@ -110,6 +116,8 @@ npm run gen:api       # → src/api/schema.d.ts，不要手改
 | `DATABASE_URL` | `postgresql+psycopg://...`，指向 Railway 的 PostgreSQL；注意 driver 前綴是 `postgresql+psycopg` |
 | `TZ` | `Asia/Taipei` |
 | `DEBUG` | `false` |
+| `API_KEY` | REQ-AUTH-000 臨時 API 金鑰，隨機值，與 GitHub Secret `VITE_API_KEY` 相同；缺少時 pre-deploy migration 與服務啟動都會失敗（fail closed） |
+| `CORS_ALLOWED_ORIGINS` | `https://abowchen2025.github.io`（只有 scheme + host；若日後有自訂網域，逗號分隔加上） |
 | `PORT` | Railway 自動注入，不用手設 |
 
 啟動指令是 Dockerfile 的 `CMD`（只起 uvicorn）。Migration 由 Railway UI 的 **pre-deploy step** `alembic upgrade head` 在切流量前跑一次；Healthcheck Path 設 `/api/v1/health/ready`（DB 可連且 migration 已到 head 才回 200）。這兩項只能在 Railway UI 設定，`railway.json` 對本服務無效（config-as-code 已於 2026-08-28 對新服務關閉），細節與還原清單見 `docs/deployment-setup.md`、`docs/adr/0006`。

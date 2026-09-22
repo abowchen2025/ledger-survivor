@@ -133,3 +133,12 @@ def test_openapi_declares_api_key_security_scheme() -> None:
     assert "parameters" not in schema["paths"][PROTECTED_PATH]["get"]
     for path in HEALTH_PATHS:
         assert "security" not in schema["paths"][path]["get"]
+
+
+@pytest.mark.parametrize("path", ["/openapi.json", "/docs", "/redoc"])
+def test_openapi_docs_closed_when_debug_false(path: str) -> None:
+    """TC-SEC-DOCS-001：DEBUG=false（Railway）時 OpenAPI 文件與互動介面不存在；DEBUG=true（本機）全開。"""
+    with TestClient(create_app(_settings(debug=False))) as client:
+        assert client.get(path).status_code == 404
+    with TestClient(create_app(_settings(debug=True))) as client:
+        assert client.get(path).status_code == 200

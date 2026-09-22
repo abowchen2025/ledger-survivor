@@ -9,6 +9,10 @@
 
 CORS（REQ-NFR-009）：明確來源清單、不用萬用字元、``allow_credentials=False``（用標頭不是 cookie）、
 ``allow_headers`` 一定要含 ``X-API-Key``，否則瀏覽器的預檢請求會擋掉正式請求。
+
+OpenAPI 文件（``/openapi.json``、``/docs``、``/redoc``）依 ``DEBUG`` 開關：``DEBUG=false``（Railway）全部關閉，
+不在公開網址上放互動式介面；``DEBUG=true``（本機，``.env.example`` 預設）全開，``npm run gen:api`` 才讀得到。
+不是為了保密（repo 公開，schema 本來就推得出來），是縮小公開面。2026-09-23 ABow 決定。
 """
 
 from fastapi import FastAPI
@@ -29,6 +33,10 @@ def create_app(settings: Settings = default_settings) -> FastAPI:
         title="Ledger Survivor API",
         version="0.1.0",
         debug=settings.debug,
+        # DEBUG=false → 三個文件端點都不存在（404）；DEBUG=true → FastAPI 預設路徑
+        openapi_url="/openapi.json" if settings.debug else None,
+        docs_url="/docs" if settings.debug else None,
+        redoc_url="/redoc" if settings.debug else None,
     )
     app.state.settings = settings
 

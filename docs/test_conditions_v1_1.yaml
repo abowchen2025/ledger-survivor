@@ -713,6 +713,15 @@
   action: 建立 Settings（等同應用啟動），分別為 API_KEY 未設定、空字串、只有空白
   expected: 皆拋 ValidationError，應用啟動失敗（fail closed）；程式碼不存在任何「不檢查」的旁路旗標
 
+- id: TC-SEC-DOCS-001
+  req: REQ-NFR-004
+  category: SEC
+  priority: P1
+  script: tests/api/test_api_key_gate.py::test_openapi_docs_closed_when_debug_false
+  preconditions: 分別以 DEBUG=false 與 DEBUG=true 建立應用（規格見 docs/spec-gaps.md 第 5 節「OpenAPI 文件依 DEBUG 開關」）
+  action: GET /openapi.json、/docs、/redoc
+  expected: DEBUG=false 三者皆 HTTP 404（Railway 不放互動式文件介面）；DEBUG=true 三者皆 200（本機 npm run gen:api 讀得到）
+
 # --- REQ-NFR-009 CORS 來源白名單（規格見 docs/spec-gaps.md 第 7 節）---
 
 - id: TC-SEC-CORS-001
@@ -774,5 +783,5 @@
 # v1.1 | 2026-09-22 | 依據改為 SRS+FS v1.2（YAML 引用的 50 個 REQ 已驗證全部能在 v1.2 找到對應，
 #                     內容不變）；新增 HEALTH 五條（TC-FUNC-HEALTH-001～005，REQ-NFR-008）、
 #                     REQ-AUTH-000 五條（TC-SEC-AUTH-000a～e）、CORS 三條（TC-SEC-CORS-001～003，
-#                     REQ-NFR-009）；實際 77 條（v1.0 檔頭寫 67 條，實際 64 條，本版只補新條目未追究差異）。
+#                     REQ-NFR-009）、DOCS 一條（TC-SEC-DOCS-001，REQ-NFR-004）；實際 78 條（v1.0 檔頭寫 67 條，實際 64 條，本版只補新條目未追究差異）。
 #                     三個 REQ 目前只存在 docs/spec-gaps.md，待 SRS 補述

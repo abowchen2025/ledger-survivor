@@ -27,8 +27,8 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
 | Networking | Public domain target port | `8080` | Railway 注入 `PORT=8080`，uvicorn 聽 8080 |
 | Variables | `DATABASE_URL` | `postgresql+psycopg://${{Postgres.PGUSER}}:${{Postgres.PGPASSWORD}}@${{Postgres.RAILWAY_PRIVATE_DOMAIN}}:5432/${{Postgres.PGDATABASE}}` | 前綴必須是 `postgresql+psycopg` |
 | Variables | `TZ` | `Asia/Taipei` | |
-| Variables | `DEBUG` | `false` | |
-| Variables | `API_KEY` | 隨機值（例如 `openssl rand -hex 32`），與 GitHub Secret `VITE_API_KEY` 相同 | REQ-AUTH-000 金鑰閘門；缺少時 pre-deploy `alembic upgrade head` 與服務啟動都失敗（fail closed），部署不會切流量 |
+| Variables | `DEBUG` | `false` | 關閉 traceback 與 `/openapi.json`、`/docs`、`/redoc` |
+| Variables | `API_KEY` | 隨機值（例如 `openssl rand -hex 32`）；使用者在前端設定頁輸入同一把（`docs/adr/0007`） | REQ-AUTH-000 金鑰閘門；缺少時 pre-deploy `alembic upgrade head` 與服務啟動都失敗（fail closed），部署不會切流量 |
 | Variables | `CORS_ALLOWED_ORIGINS` | `https://abowchen2025.github.io` | REQ-NFR-009；只有 scheme + host，不含路徑、不可 `*`（帶了啟動就報錯） |
 | 專案 Settings → Tokens | Project token（production） | 值放 GitHub Secret `RAILWAY_TOKEN` | |
 
@@ -107,7 +107,7 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
   - 前綴一定是 `postgresql+psycopg://`。Postgres 服務自己提供的 `DATABASE_URL` 是 `postgresql://`，SQLAlchemy 會去找 psycopg2，映像裡沒有，會啟動失敗。
   - 用 `RAILWAY_PRIVATE_DOMAIN`（內網），不走公網 `PGHOST`，免費且較快。
   - `PORT` 不用設，Railway 自動注入。
-  - `API_KEY`（REQ-AUTH-000）的同一個值要放到 GitHub Secret `VITE_API_KEY`（見 B4b）。沒設 `API_KEY` 的部署會在 pre-deploy 就失敗，這是設計（fail closed）。
+  - `API_KEY`（REQ-AUTH-000）的同一個值之後要在 Pages 的「設定」頁輸入（見 B4b）。沒設 `API_KEY` 的部署會在 pre-deploy 就失敗，這是設計（fail closed）。
   - `CORS_ALLOWED_ORIGINS` 只寫 `https://abowchen2025.github.io`，不要加 `/ledger-survivor/`（Origin 標頭不帶路徑，加了啟動時就會被拒）。
 - [ ] **按畫布右上角「Deploy」套用並等待完成**：Railway 新版畫布把 UI 改動先暫存為左上角「Apply N changes」，沒按 Deploy 就完全不會寫入（2026-09-21 兩次踩到：服務名稱與 pre-deploy 都曾停在待套用狀態）。
 - [ ] 驗證：Variables 分頁看到五個變數，`DATABASE_URL` 的值顯示為已解析的連線字串（滑鼠移過去會展開）。
@@ -130,13 +130,14 @@ Railway 的 **Config as Code 已棄用**：服務頁顯示「Config as Code is d
 - [ ] （只有服務名稱不是 `backend` 時）同一頁切到「Variables」分頁 → New repository variable → Name `RAILWAY_SERVICE`，Value 填實際服務名稱。
 - [ ] 驗證：Secrets 清單看到 `RAILWAY_TOKEN`（值看不到，正常）。
 
-### B4b. 前端建置用的兩個 GitHub Secrets（REQ-AUTH-000 之後必要）
+### B4b. 前端建置用的 GitHub Secret 與金鑰輸入（REQ-AUTH-000 之後必要）
 
 - [ ] GitHub repo → Settings → Secrets and variables → Actions → New repository secret：
-  - `VITE_API_BASE_URL`：Railway backend 服務的 public domain，含 `https://`，只到 host，例如 `https://backend-production-xxxx.up.railway.app`（不含 `/api/v1`、不含結尾 `/`）
-  - `VITE_API_KEY`：與 Railway Variables 的 `API_KEY` **完全相同**的值
-- [ ] 沒設這兩個 Secret 時 `Deploy frontend (GitHub Pages)` 會在「Check build-time secrets are set」步驟失敗，這是設計：不要部署一個打不到後端的前端。
-- [ ] 驗證（部署完成後）：開 https://abowchen2025.github.io/ledger-survivor/#/settings，「後端連線」顯示「正常（user_id=1）」。顯示「金鑰不符（401）」→ 兩邊金鑰不同；顯示「連不上：Failed to fetch」→ 多半是 CORS（`CORS_ALLOWED_ORIGINS` 沒設或帶了路徑）或 `VITE_API_BASE_URL` 錯，開 devtools Network 看 OPTIONS 預檢的回應。
+  - `VITE_API_BASE_URL`：`https://backend-production-10c5.up.railway.app`（Railway backend 的 public domain，只到 host，不含 `/api/v1`、不含結尾 `/`）
+  - **不要**建 `VITE_API_KEY`：金鑰不進 build 產物（`docs/adr/0007`），workflow 建完會 grep `dist/`，有金鑰就失敗。
+- [ ] 沒設 `VITE_API_BASE_URL` 時 `Deploy frontend (GitHub Pages)` 會在「Check build-time secret is set」步驟失敗，這是設計：不要部署一個打不到後端的前端。
+- [ ] 部署完成後，開 https://abowchen2025.github.io/ledger-survivor/#/settings，在「API 金鑰」貼上 Railway Variables 的 `API_KEY` 按「儲存」（存在該瀏覽器的 localStorage，每個裝置一次）。
+- [ ] 驗證：「後端連線」顯示「正常（user_id=1）」。顯示「金鑰不符（401）」→ 輸入的值與 Railway 不同；顯示「連不上：Failed to fetch」→ 多半是 CORS（`CORS_ALLOWED_ORIGINS` 沒設或帶了路徑）或 `VITE_API_BASE_URL` 錯，開 devtools Network 看 OPTIONS 預檢的回應。
 
 ### B5. 觸發後端部署並驗證 migration 真的跑了
 
@@ -163,14 +164,14 @@ Railway 目前是 **Trial 方案**：一次性 US$5 額度、**沒有用量警�
 
 ### B7. 警告：部署環境只能放測試資料
 
-> **在 REQ-AUTH-000（臨時 API 金鑰閘門，`docs/spec-gaps.md` 第 5 節）合併並部署、且 Railway 已設定 `API_KEY`（B3）與 GitHub 已設定 `VITE_API_KEY`（B4b）之前，Railway 上的後端是公開網址、沒有任何認證，任何人拿到網址就能讀寫。**
+> **在 REQ-AUTH-000（臨時 API 金鑰閘門，`docs/spec-gaps.md` 第 5 節）合併並部署、且 Railway 已設定 `API_KEY`（B3）、你已在 Pages 設定頁輸入同一把金鑰（B4b）之前，Railway 上的後端是公開網址、沒有任何認證，任何人拿到網址就能讀寫。**
 > 這段期間 Railway 環境只能用來驗證部署與 migration，**不要輸入任何真實花費資料**。Phase 1 開發期間用本機環境與假資料。
 > 閘門上線後的驗證（四個 curl，`<host>` 是 Railway 網址、`<key>` 是 `API_KEY`）：
 > `curl -i https://<host>/api/v1/auth/me` → 401 `{"detail":"unauthorized"}`；
 > `curl -i -H "X-API-Key: wrong" https://<host>/api/v1/auth/me` → 401，body 與前者完全相同；
 > `curl -i -H "X-API-Key: <key>" https://<host>/api/v1/auth/me` → 200 `{"user_id":1}`；
 > `curl -i https://<host>/api/v1/health/ready` → 200（不需金鑰）。
-> 金鑰嵌在前端 bundle、devtools 看得到：它擋隨機掃描，不擋針對性攻擊，Phase 3 換 JWT。
+> 金鑰只在 Railway Variables 與你的瀏覽器 localStorage（`docs/adr/0007`）：它擋隨機掃描與讀 bundle 的人，不擋針對性攻擊，Phase 3 換 JWT。
 
 ---
 

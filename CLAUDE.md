@@ -43,7 +43,7 @@
 - 不存完整信用卡號，只存 `last4`
 - 路由（`routers/`）不放業務邏輯，一律進 `services/`
 - 新增業務 router 一律 include 進 `routers/protected.py` 的 `router`（REQ-AUTH-000 金鑰閘門掛在那一層），不要在 `main.py` 直接 include；只有 `routers/health.py` 三個端點豁免
-- 前端不直接呼叫 `fetch`，一律經 `frontend/src/api/client.ts`（統一帶 base URL 與 `X-API-Key`）
+- 前端不直接呼叫 `fetch`，一律經 `frontend/src/api/client.ts`（統一帶 base URL 與 `X-API-Key`）；金鑰由使用者在設定頁輸入、存 localStorage，**不得**做成建置期變數或 GitHub Secret 嵌進產物（`docs/adr/0007`）；頁面在 catch 用 `useAuthFailureRedirect` 導向設定頁
 - 分期不建 `expenses` 記錄；期初卡債不進分類分析
 - 不得為了 CI 綠燈 skip／xfail 測試而不寫原因
 - 修改測試預期值要另開 `test:` commit 並在 PR 說明列出改了什麼、為什麼
@@ -106,6 +106,6 @@ npm run week:dump               # 一致性測試用：前端對 fixture 全部�
 
 Phase 1：核心記帳（收入設定、信用卡主檔、花費 CRUD、首頁快速記帳、月曆）。完成標準見 `docs/architecture_v2_2.md` 第 9 節。
 
-Phase 1 第一輪（分支 `phase-1-auth-cors`，2026-09-22）：REQ-AUTH-000 臨時 API 金鑰閘門（fail closed、router 層級、三個 health 豁免）、CORS 來源白名單（REQ-NFR-009，暫定編號）、前端 `api/client.ts`、測試條件升 v1.1。規格缺口與待 ABow 決定事項見 `docs/spec-gaps.md` 第 5、7 節。
+Phase 1 第一輪（分支 `phase-1-auth-cors`，PR #3，2026-09-22～23）：REQ-AUTH-000 臨時 API 金鑰閘門（fail closed、router 層級、三個 health 豁免、`/auth/me` 保留）、金鑰由使用者輸入存 localStorage（`docs/adr/0007`）、OpenAPI 文件依 `DEBUG` 開關、CORS 來源白名單（REQ-NFR-009，暫定編號）、前端 `api/client.ts`、測試條件升 v1.1。規格缺口見 `docs/spec-gaps.md` 第 5、7 節。
 
 已完成：Phase 0a（後端骨架、12 張表、seed、`week_rule` 測試）、Phase 0b（前端骨架六頁、PWA、前後端 `week_rule` 一致性測試 TC-SEC-WEEK-004、CI 三條 workflow、Dockerfile、README；`railway.json` 已刪除，Railway 設定只在 UI）。路由方式 HashRouter 已採納（`docs/adr/0004`）；雲端 migration 走 Railway pre-deploy、健康檢查拆 live／ready（`docs/adr/0006`）。Pages 與 Railway 皆已上線，見 `docs/deployment-setup.md` 開頭「目前狀態」。

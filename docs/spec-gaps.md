@@ -60,14 +60,14 @@
 | 後端 | 讀環境變數 `API_KEY`；以 FastAPI dependency 檢查請求標頭 `X-API-Key`，掛在 `routers/protected.py` 的 **router 層級**（不逐個端點掛，新增端點不會漏），套用到 `/api/v1` 下所有路由。比對用 `secrets.compare_digest`（常數時間） | 條文 |
 | 失敗回應 | 標頭缺少或不符**一律** `401`，錯誤訊息固定同一句（例如 `{"detail": "unauthorized"}`），不透露「缺少」與「不符」的差異，避免用回應內容探測 | 條文 |
 | 豁免 | 只有三個：`GET /api/v1/health`、`/api/v1/health/live`、`/api/v1/health/ready`（`routers/health.py` 不經 protected router），讓 Railway healthcheck 能用。其餘一律檢查，含未來所有業務端點 | 條文（2026-09-22 ABow 指定豁免清單只有這三個） |
-| 未設定 `API_KEY` | 環境變數缺少或為空時，後端啟動即失敗（fail closed），不得退化成「不檢查」；**不設任何旁路旗標**，程式碼裡不存在「不檢查」的分支。本機開發由 `.env.example` 附一個開發用值（`API_KEY=dev-local-only-not-a-secret`），本機一樣走完整檢查路徑；前端 `.env.example` 對應 `VITE_API_KEY` 同值 | 條文（2026-09-21 ABow 確認 fail closed、無旁路旗標） |
-| 前端 | 建置期環境變數 `VITE_API_KEY`，所有對 `/api/v1` 的請求帶 `X-API-Key` | 條文 |
-| 金鑰存放 | GitHub Secrets（`VITE_API_KEY`，給 `deploy-frontend.yml` 建置用）與 Railway Variables（`API_KEY`），不進版控；`.env.example` 只列名稱 | README 與 deployment-setup 補步驟 |
-| 安全邊界（必須明寫） | 金鑰嵌在前端 build 產物裡，任何人打開 devtools 都看得到。它擋的是隨機掃描與爬蟲，不是針對性攻擊 | 條文加註 |
+| 未設定 `API_KEY` | 環境變數缺少或為空時，後端啟動即失敗（fail closed），不得退化成「不檢查」；**不設任何旁路旗標**，程式碼裡不存在「不檢查」的分支。本機開發由 `.env.example` 附一個開發用值（`API_KEY=dev-local-only-not-a-secret`），本機一樣走完整檢查路徑；前端 `.env.example` 的 `VITE_DEV_API_KEY` 同值（只在 dev build 生效） | 條文（2026-09-21 ABow 確認 fail closed、無旁路旗標） |
+| 前端 | 金鑰由使用者在設定頁輸入一次、存瀏覽器 `localStorage`（鍵 `ledger-survivor.api-key`），`src/api/client.ts` 從 `src/api/api-key.ts` 取值後所有對 `/api/v1` 的請求帶 `X-API-Key`。本機 dev build 可用 `VITE_DEV_API_KEY` 作預設值，`localStorage` 優先；production build 一律忽略該變數。沒有金鑰時不送請求、丟 `ApiKeyMissingError`，其他頁面遇到它或 401 導向設定頁（`src/api/auth-guard.ts`）。決策見 `docs/adr/0007` | 條文（2026-09-23 ABow 決定改為使用者輸入；原「建置期 `VITE_API_KEY`」作廢） |
+| 金鑰存放 | 只有兩處：Railway Variables（`API_KEY`）與使用者瀏覽器的 `localStorage`。不進版控、不進 build 產物、**沒有** GitHub Secret（`deploy-frontend.yml` 建完後 grep `dist/`，出現金鑰或 `VITE_DEV_API_KEY` 就失敗）。`.env.example` 只放開發用值 | README 與 deployment-setup 已補步驟 |
+| 安全邊界（必須明寫） | 金鑰不在產物裡；repo 與 Pages 公開也拿不到。它擋隨機掃描、爬蟲與「照 repo 找到 Pages 再讀 bundle」的人，不擋針對性攻擊（裝置被拿走、同源 XSS 讀 `localStorage`）。代價：每個裝置第一次要輸入一次 | 條文加註 |
 | 移除時機 | Phase 3 導入 JWT（REQ-AUTH-001 起）後整套移除：dependency、環境變數、前端標頭、相關 TC | 條文加註；Phase 3 的驗收條件加「REQ-AUTH-000 已移除」 |
 | 測試條件（已進 `docs/test_conditions_v1_1.yaml`） | `TC-SEC-AUTH-000a`：無 `X-API-Key` → 401；`TC-SEC-AUTH-000b`：錯誤金鑰 → 401 且回應 body 與 000a 完全相同；`TC-SEC-AUTH-000c`：正確金鑰 → 200；`TC-SEC-AUTH-000d`：三個 health 端點無金鑰 → 非 401；`TC-SEC-AUTH-000e`：`API_KEY` 未設定 → 應用啟動失敗。script `tests/api/test_api_key_gate.py` | req 回追 REQ-AUTH-000 |
-| **新增缺口：驗證用受保護端點** | SRS 在 Phase 1～2 沒有任何非 health 端點，閘門無法用 curl／前端驗證「正確金鑰回 200」。本輪新增 `GET /api/v1/auth/me` → `200 {"user_id": 1}`（`routers/auth.py`，值取 `settings.default_user_id`，對應 REQ-AUTH-001「所有請求視為 user_id=1」）。Phase 3 導入 JWT 後改回 token 內的 user_id，不刪端點 | **需要 ABow 決定**：保留（建議，Phase 3 沿用）、改名，或第一個業務端點上線後刪除；SRS 4.x 認證模組補這條 API |
-| **新增缺口：OpenAPI 文件不在閘門內** | `/openapi.json`、`/docs`、`/redoc` 在 `/api/v1` 之外，不受金鑰檢查。理由：`npm run gen:api`（openapi-typescript 7 的 CLI 不支援自訂標頭）要能直接讀 `/openapi.json`；文件內容由 public repo 的程式碼產生，沒有機密。OpenAPI 以 `securitySchemes.ApiKeyAuth`（`APIKeyHeader`）宣告，受保護操作帶 `security`，health 沒有；`X-API-Key` 不會變成每個操作的參數（`schema.d.ts` 不受污染） | 條文加註豁免範圍；若 ABow 要把文件端點也關掉，`gen:api` 要改成 `curl -H X-API-Key ... \| openapi-typescript`，先問 |
+| **新增缺口：驗證用受保護端點**（2026-09-23 ABow 決定：**保留**） | SRS 在 Phase 1～2 沒有任何非 health 端點，閘門無法用 curl／前端驗證「正確金鑰回 200」。新增 `GET /api/v1/auth/me` → `200 {"user_id": 1}`（`routers/auth.py`，值取 `settings.default_user_id`，對應 REQ-AUTH-001「所有請求視為 user_id=1」）。**Phase 3 改為回傳 JWT 內的 `user_id`**，端點不刪 | SRS 4.x 認證模組補這條 API，標註 Phase 3 行為 |
+| **新增缺口：OpenAPI 文件依 `DEBUG` 開關**（2026-09-23 ABow 決定） | `/openapi.json`、`/docs`、`/redoc` 在 `/api/v1` 之外，不受金鑰檢查，改由 `DEBUG` 控制：`DEBUG=false`（Railway）三個端點不存在（404）；`DEBUG=true`（本機，`.env.example` 預設）全開，`npm run gen:api` 讀本機 `127.0.0.1:8765` 不受影響。理由不是保密（repo 公開，schema 推得出來），是不在公開網址放互動式介面。OpenAPI 以 `securitySchemes.ApiKeyAuth` 宣告，受保護操作帶 `security`，health 沒有；`X-API-Key` 不會變成每個操作的參數。測試 `TC-SEC-DOCS-001`（`tests/api/test_api_key_gate.py::test_openapi_docs_closed_when_debug_false`） | 第五章 5.2 加一列；`DEBUG` 同時控制 traceback（REQ-NFR-004）與文件端點，條文要寫清楚 |
 | **新增缺口：401 回應格式** | `401`，body 固定 `{"detail": "unauthorized"}`，`Content-Type: application/json`；不帶 `WWW-Authenticate`（沒有瀏覽器原生驗證流程要觸發） | 條文；日後 API 錯誤格式統一時一起定 |
 | **新增缺口：CORS 預檢不經閘門** | 瀏覽器預檢 `OPTIONS` 不帶 `X-API-Key`，由 `CORSMiddleware` 在路由前回應，不會被 401（`tests/api/test_cors.py::test_preflight_for_health_does_not_require_api_key`）。金鑰的傳遞方式（自訂標頭）與 CORS 的關係見第 7 節 | 條文加註 |
 
@@ -104,7 +104,7 @@
 | 標頭 | `X-API-Key`（必含，否則預檢擋掉正式請求）、`Content-Type` | 條文 |
 | 預檢結果 | 白名單來源 → `200`，`Access-Control-Allow-Origin` 等於該來源；非白名單 → `400 Disallowed CORS origin`，不含 `Allow-Origin`（Starlette 仍附靜態的 `Allow-Methods`／`Allow-Headers`，瀏覽器只看 `Allow-Origin`） | 條文與回應格式 |
 | 測試條件（已進 `docs/test_conditions_v1_1.yaml`） | `TC-SEC-CORS-001` 白名單預檢帶 `X-API-Key` 通過；`002` 非白名單預檢被拒；`003` 正式請求只對白名單來源回 `Allow-Origin` | req 回追 REQ-NFR-009 |
-| **新增缺口：前端建置期變數** | `VITE_API_BASE_URL`（只到 host[:port]，不含 `/api/v1`）、`VITE_API_KEY`；`frontend/src/api/client.ts` 是後端呼叫唯一入口（帶 base URL 與 `X-API-Key`，非 2xx 丟 `ApiError`）。Pages 由 GitHub Secrets 同名注入，`deploy-frontend.yml` 缺任一個就讓 build 失敗 | 架構描述 6.x 或 SRS 第五章補「前端設定」；README 已列 |
-| **新增缺口：設定頁後端連線狀態** | `frontend/src/components/ApiStatus.tsx` 在設定頁打 `GET /auth/me` 顯示連線結果（正常／401／連不上），是 base URL、金鑰與 CORS 三件事的可見驗證 | SRS 4.x 設定頁畫面補一個「後端連線」區塊，或 ABow 決定 Phase 1 業務畫面進來後移除 |
+| **新增缺口：前端建置期變數** | 只有 `VITE_API_BASE_URL`（只到 host[:port]，不含 `/api/v1`），Pages 由同名 GitHub Secret 注入，缺了 build 失敗。`VITE_DEV_API_KEY` 只是本機 dev 預設值，production build 忽略。`frontend/src/api/client.ts` 是後端呼叫唯一入口（帶 base URL 與 `X-API-Key`，非 2xx 丟 `ApiError`）。金鑰本身見第 5 節與 `docs/adr/0007` | 架構描述 6.x 或 SRS 第五章補「前端設定」；README 已列 |
+| **新增缺口：設定頁金鑰欄位與後端連線狀態** | `frontend/src/components/ApiKeyForm.tsx`：金鑰輸入、儲存到 `localStorage`、清除、顯示目前來源（已儲存／開發預設／尚未設定），從其他頁被導過來時顯示原因；`ApiStatus.tsx` 打 `GET /auth/me` 顯示連線結果（正常／尚未設定金鑰／401／連不上），存完金鑰立刻重查 | SRS 4.x 設定頁畫面補「API 金鑰」與「後端連線」兩個區塊（Phase 3 移除金鑰區塊） |
 
 小節 1～4 對應 2026-09-20 回覆的第 1～4 點；小節 5～6 為 2026-09-21 新增；小節 7 為 2026-09-22 新增。第 5～7 節標「已實作」但**不刪任何一列**，等新版 SRS 回來再一起清（2026-09-22 ABow 指示）。

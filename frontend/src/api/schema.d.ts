@@ -21,14 +21,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/health/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health Live */
+        get: operations["health_live_api_v1_health_live_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/health/ready": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Health Ready */
+        get: operations["health_ready_api_v1_health_ready_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Me */
+        get: operations["me_api_v1_auth_me_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
-        /** HealthResponse */
+        /**
+         * HealthResponse
+         * @description GET /health 與 /health/live：只表示程序活著。
+         */
         HealthResponse: {
-            /** Status */
-            status: string;
+            /**
+             * Status
+             * @constant
+             */
+            status: "ok";
+        };
+        /**
+         * MeResponse
+         * @description 目前請求被視為哪個使用者（REQ-AUTH-001：初版固定 user_id=1）。
+         */
+        MeResponse: {
+            /** User Id */
+            user_id: number;
+        };
+        /** MigrationCheck */
+        MigrationCheck: {
+            /** Ok */
+            ok: boolean;
+            /** Db Revision */
+            db_revision: string | null;
+            /** Code Head */
+            code_head: string;
+        };
+        /** ReadinessChecks */
+        ReadinessChecks: {
+            /**
+             * Db
+             * @enum {string}
+             */
+            db: "ok" | "error";
+            migration: components["schemas"]["MigrationCheck"];
+        };
+        /**
+         * ReadinessResponse
+         * @description GET /health/ready：200 時 status=ok；503 時 status=degraded，checks 說明哪一項不符。
+         */
+        ReadinessResponse: {
+            /**
+             * Status
+             * @enum {string}
+             */
+            status: "ok" | "degraded";
+            checks: components["schemas"]["ReadinessChecks"];
         };
     };
     responses: never;
@@ -55,6 +150,75 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    health_live_api_v1_health_live_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["HealthResponse"];
+                };
+            };
+        };
+    };
+    health_ready_api_v1_health_ready_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+            /** @description Service Unavailable */
+            503: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ReadinessResponse"];
+                };
+            };
+        };
+    };
+    me_api_v1_auth_me_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MeResponse"];
                 };
             };
         };

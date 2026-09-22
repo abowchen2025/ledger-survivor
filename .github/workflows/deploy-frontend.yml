@@ -1,5 +1,9 @@
 # push main 時 build 前端並部署到 GitHub Pages（專案站台 /ledger-survivor/）。
-# 前置設定：GitHub repo Settings → Pages → Source 選「GitHub Actions」。不需要任何 Secret。
+# 前置設定：GitHub repo Settings → Pages → Source 選「GitHub Actions」。
+# 需要的 GitHub Secrets（值不寫在這裡，清單見 README.md「需要的 GitHub 設定」）：
+#   secrets.VITE_API_BASE_URL   Railway 後端網址，只到 host，例如 https://xxx.up.railway.app
+#   secrets.VITE_API_KEY        REQ-AUTH-000 臨時 API 金鑰，須等於 Railway Variables 的 API_KEY
+# 兩者是 Vite 建置期變數，會嵌進 bundle；缺任一個就讓 build 失敗（fail closed），不要部署一個打不到後端的前端。
 name: Deploy frontend (GitHub Pages)
 
 on:
@@ -42,7 +46,24 @@ jobs:
       - name: vitest
         run: npm run test
 
+      - name: Check build-time secrets are set
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
+        run: |
+          missing=0
+          for name in VITE_API_BASE_URL VITE_API_KEY; do
+            if [ -z "${!name}" ]; then
+              echo "::error::GitHub Secret $name is not set (see README.md 需要的 GitHub 設定)"
+              missing=1
+            fi
+          done
+          exit $missing
+
       - name: Build
+        env:
+          VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
+          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
         run: npm run build
 
       - name: Configure Pages

@@ -1,9 +1,9 @@
 # push main 時 build 前端並部署到 GitHub Pages（專案站台 /ledger-survivor/）。
 # 前置設定：GitHub repo Settings → Pages → Source 選「GitHub Actions」。
-# 需要的 GitHub Secrets（值不寫在這裡，清單見 README.md「需要的 GitHub 設定」）：
+# 需要的 GitHub Secret（值不寫在這裡，清單見 README.md「需要的 GitHub 設定」）：
 #   secrets.VITE_API_BASE_URL   Railway 後端網址，只到 host，例如 https://xxx.up.railway.app
-#   secrets.VITE_API_KEY        REQ-AUTH-000 臨時 API 金鑰，須等於 Railway Variables 的 API_KEY
-# 兩者是 Vite 建置期變數，會嵌進 bundle；缺任一個就讓 build 失敗（fail closed），不要部署一個打不到後端的前端。
+# 這是 Vite 建置期變數，會嵌進 bundle；缺了就讓 build 失敗（fail closed），不要部署一個打不到後端的前端。
+# API 金鑰**不**在這裡注入：由使用者在設定頁輸入、存 localStorage（docs/adr/0007）；production build 忽略 VITE_DEV_API_KEY。
 name: Deploy frontend (GitHub Pages)
 
 on:
@@ -46,25 +46,29 @@ jobs:
       - name: vitest
         run: npm run test
 
-      - name: Check build-time secrets are set
+      - name: Check build-time secret is set
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
         run: |
-          missing=0
-          for name in VITE_API_BASE_URL VITE_API_KEY; do
-            if [ -z "${!name}" ]; then
-              echo "::error::GitHub Secret $name is not set (see README.md 需要的 GitHub 設定)"
-              missing=1
-            fi
-          done
-          exit $missing
+          if [ -z "$VITE_API_BASE_URL" ]; then
+            echo "::error::GitHub Secret VITE_API_BASE_URL is not set (see README.md 需要的 GitHub 設定)"
+            exit 1
+          fi
 
       - name: Build
         env:
           VITE_API_BASE_URL: ${{ secrets.VITE_API_BASE_URL }}
-          VITE_API_KEY: ${{ secrets.VITE_API_KEY }}
+          # 故意塞一個哨兵值：production build 必須完全忽略 VITE_DEV_API_KEY，下一步用產物驗證
+          VITE_DEV_API_KEY: canary-must-not-appear-in-dist
         run: npm run build
+
+      - name: Assert no API key in the bundle
+        # 金鑰不得進產物（docs/adr/0007）：哨兵值出現在 dist 就代表 production build 會嵌入金鑰，擋下部署
+        run: |
+          if grep -rq "canary-must-not-appear-in-dist\|dev-local-only-not-a-secret" dist; then
+            echo "::error::dist contains the VITE_DEV_API_KEY value; production build must ignore it"
+            exit 1
+          fi
 
       - name: Configure Pages
         uses: actions/configure-pages@v5

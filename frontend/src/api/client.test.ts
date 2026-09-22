@@ -1,12 +1,22 @@
 /**
  * API client 單元測試：所有請求都要經過 apiFetch 帶 base URL 與 X-API-Key（REQ-AUTH-000）。
- * fetch 以 vi.stubGlobal 取代，不真的連網。
+ * fetch 以 vi.stubGlobal 取代，不真的連網；金鑰用記憶體 storage 注入，不碰 localStorage。
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { API_KEY_HEADER, ApiError, apiFetch, getApiConfig } from "./client";
+import { API_KEY_STORAGE_KEY, type KeyStorage } from "./api-key";
+import { API_KEY_HEADER, ApiError, ApiKeyMissingError, apiFetch, getApiBaseUrl, getApiConfig, isAuthFailure } from "./client";
 
-const config = { baseUrl: "http://127.0.0.1:8765", apiKey: "test-key" };
+const config = { baseUrl: "http://127.0.0.1:8765", apiKey: "test-key", apiKeySource: "stored" as const };
+
+function memoryStorage(initial: Record<string, string> = {}): KeyStorage {
+  const data = new Map(Object.entries(initial));
+  return {
+    getItem: (k) => data.get(k) ?? null,
+    setItem: (k, v) => void data.set(k, v),
+    removeItem: (k) => void data.delete(k),
+  };
+}
 
 function stubFetch(status: number, body: unknown, contentType = "application/json") {
   const fetchMock = vi.fn(async () =>
@@ -29,23 +39,33 @@ afterEach(() => {
   vi.unstubAllEnvs();
 });
 
-describe("getApiConfig", () => {
-  it("讀 VITE_API_BASE_URL 與 VITE_API_KEY，去掉 base URL 結尾斜線", () => {
-    expect(getApiConfig({ VITE_API_BASE_URL: "https://api.example/", VITE_API_KEY: "k" })).toEqual({
-      baseUrl: "https://api.example",
-      apiKey: "k",
+describe("getApiBaseUrl / getApiConfig", () => {
+  it("讀 VITE_API_BASE_URL，去掉結尾斜線", () => {
+    expect(getApiBaseUrl({ VITE_API_BASE_URL: "https://api.example/" })).toBe("https://api.example");
+  });
+
+  it("缺 base URL 就丟錯", () => {
+    expect(() => getApiBaseUrl({ VITE_API_BASE_URL: "" })).toThrow(/VITE_API_BASE_URL/);
+  });
+
+  it("金鑰：localStorage 優先於 dev 預設值", () => {
+    const env = { VITE_API_BASE_URL: "http://x", DEV: true, VITE_DEV_API_KEY: "dev-key" };
+    expect(getApiConfig({ env, storage: memoryStorage({ [API_KEY_STORAGE_KEY]: "typed" }) })).toEqual({
+      baseUrl: "http://x",
+      apiKey: "typed",
+      apiKeySource: "stored",
     });
+    expect(getApiConfig({ env, storage: memoryStorage() })).toEqual({ baseUrl: "http://x", apiKey: "dev-key", apiKeySource: "dev-default" });
   });
 
-  it("缺 base URL 或金鑰就丟錯，不會默默送出沒金鑰的請求", () => {
-    expect(() => getApiConfig({ VITE_API_BASE_URL: "", VITE_API_KEY: "k" })).toThrow(/VITE_API_BASE_URL/);
-    expect(() => getApiConfig({ VITE_API_BASE_URL: "http://x", VITE_API_KEY: "  " })).toThrow(/VITE_API_KEY/);
+  it("production 沒存過金鑰 → ApiKeyMissingError，不會退回 dev 預設值", () => {
+    const env = { VITE_API_BASE_URL: "http://x", DEV: false, VITE_DEV_API_KEY: "dev-key" };
+    expect(() => getApiConfig({ env, storage: memoryStorage() })).toThrow(ApiKeyMissingError);
   });
 
-  it("預設從 import.meta.env 讀", () => {
+  it("預設從 import.meta.env 讀 base URL", () => {
     vi.stubEnv("VITE_API_BASE_URL", "http://127.0.0.1:8765");
-    vi.stubEnv("VITE_API_KEY", "dev-local-only-not-a-secret");
-    expect(getApiConfig()).toEqual({ baseUrl: "http://127.0.0.1:8765", apiKey: "dev-local-only-not-a-secret" });
+    expect(getApiBaseUrl()).toBe("http://127.0.0.1:8765");
   });
 });
 
@@ -84,11 +104,19 @@ describe("apiFetch", () => {
     await expect(apiFetch("/api/v1/auth/me", { config, method: "DELETE" })).resolves.toBeUndefined();
   });
 
-  it("沒有 config 且環境變數缺少時丟錯，不會呼叫 fetch", async () => {
+  it("沒有 config 且 base URL 缺少時丟錯，不會呼叫 fetch", async () => {
     const fetchMock = stubFetch(200, {});
     vi.stubEnv("VITE_API_BASE_URL", "");
-    vi.stubEnv("VITE_API_KEY", "");
     await expect(apiFetch("/api/v1/auth/me")).rejects.toThrow(/VITE_API_BASE_URL/);
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+});
+
+describe("isAuthFailure", () => {
+  it("金鑰缺少與 401 都算，其他不算", () => {
+    expect(isAuthFailure(new ApiKeyMissingError())).toBe(true);
+    expect(isAuthFailure(new ApiError(401, { detail: "unauthorized" }))).toBe(true);
+    expect(isAuthFailure(new ApiError(500, null))).toBe(false);
+    expect(isAuthFailure(new TypeError("Failed to fetch"))).toBe(false);
   });
 });

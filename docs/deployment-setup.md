@@ -2,12 +2,11 @@
 
 本清單列出 GitHub Pages 與 Railway 第一次部署前需要**手動**在網頁介面做的事，逐條打勾。Claude Code 不代勞這些步驟。做完後把結果（含失敗的完整錯誤）回報，再決定是否需要改 workflow。
 
-目前狀態（2026-09-21，PR #2 合併後）：
+目前狀態（2026-09-22）：
 
-- `Deploy frontend (GitHub Pages)` 首跑失敗於 `Configure Pages`：`Get Pages site failed. Please verify that the repository has Pages enabled and configured to build using GitHub Actions` → Pages 尚未啟用。
-- `Deploy backend (Railway)` 首跑失敗於 `railway up`：`Invalid RAILWAY_TOKEN. Please check that it is valid and has access to the resource you're trying to use.` → Secret 尚未設定（log 顯示 `RAILWAY_TOKEN:` 為空）。
-
-兩者都是環境未設定造成，不是 workflow 邏輯問題。設定完成後重跑 workflow 即可驗證。
+- **GitHub Pages：已上線。** `Deploy frontend (GitHub Pages)` 2026-09-21 手動 run 成功；https://abowchen2025.github.io/ledger-survivor/ 回 200，`manifest.webmanifest` 的 `start_url`／`scope` 為 `/ledger-survivor/`。A3 驗證 4（手機加入主畫面）待 ABow 回報。
+- **Railway：已上線，migration 由 pre-deploy 執行。** 2026-09-22 Deploy Logs 依序出現 `Running upgrade -> 0001` 與 `Running upgrade 0001 -> 0002`，pre-deploy 容器結束後正式容器啟動，`/api/v1/health/ready` 回 200。
+- 2026-09-21 的兩次失敗（Pages 未啟用、`RAILWAY_TOKEN` 未設）與 Railway 設定「填了沒生效」（pre-deploy 未跑、`railway up` 回 404）都已處理；後者原因見第 D 節「在 Railway UI 設定後完全沒有作用」一列。
 
 ---
 

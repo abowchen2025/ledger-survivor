@@ -104,4 +104,4 @@ npm run week:dump               # 一致性測試用：前端對 fixture 全部�
 
 Phase 1：核心記帳（收入設定、信用卡主檔、花費 CRUD、首頁快速記帳、月曆）。完成標準見 `docs/architecture_v2_2.md` 第 9 節。
 
-已完成：Phase 0a（後端骨架、12 張表、seed、`week_rule` 測試）、Phase 0b（前端骨架六頁、PWA、前後端 `week_rule` 一致性測試 TC-SEC-WEEK-004、CI 三條 workflow、Dockerfile／railway.json、README）。路由方式 HashRouter 為提議狀態，見 `docs/adr/0004`。
+已完成：Phase 0a（後端骨架、12 張表、seed、`week_rule` 測試）、Phase 0b（前端骨架六頁、PWA、前後端 `week_rule` 一致性測試 TC-SEC-WEEK-004、CI 三條 workflow、Dockerfile、README；`railway.json` 已刪除，Railway 設定只在 UI）。路由方式 HashRouter 已採納（`docs/adr/0004`）；雲端 migration 走 Railway pre-deploy、健康檢查拆 live／ready（`docs/adr/0006`）。Pages 與 Railway 皆已上線，見 `docs/deployment-setup.md` 開頭「目前狀態」。

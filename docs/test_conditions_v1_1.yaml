@@ -1,6 +1,8 @@
-# 記帳生存遊戲（Ledger Survivor）測試條件 v1.0
-# 日期：2026-09-16
-# 依據：SRS+FS v1.1（req 欄回追對應 REQ 編號）、架構描述 v2.2 第11節（品質與驗證，11.5高風險區重點覆蓋）
+# 記帳生存遊戲（Ledger Survivor）測試條件 v1.1
+# 日期：2026-09-22（首版 2026-09-16）
+# 依據：SRS+FS v1.2（req 欄回追對應 REQ 編號；v1.2 只補 REQ 編號與追溯矩陣，業務規則與 v1.1 零變動）、
+#       架構描述 v2.2 第11節（品質與驗證，11.5高風險區重點覆蓋）、
+#       docs/spec-gaps.md 第 5～7 節（REQ-AUTH-000、REQ-NFR-008、REQ-NFR-009，待 SRS 補述的規格）
 # 格式骨架：rachel-qa TC 格式（分類標準：AUTH／SEC／FUNC／UI／E2E／EDGE／NEG／PERF）
 # 用途：Claude Code 讀取本檔案後，依 script 路徑產生對應測試碼；執行結果回填 actual／status 供規劃端判讀
 # 優先級：P0（核心不可妥協，上線前必過）／P1（重要）／P2（次要，可延後）
@@ -594,6 +596,55 @@
   expected: 文案陳述事實與數字對比，不含「太多」「應該」等道德評價字眼
 
 # ============================================================
+# 模組：HEALTH — 健康檢查端點（REQ-NFR-008，規格見 docs/spec-gaps.md 第 6 節、docs/adr/0006）
+# ============================================================
+
+- id: TC-FUNC-HEALTH-001
+  req: REQ-NFR-008
+  category: FUNC
+  priority: P0
+  script: tests/api/test_health.py::test_health_live_returns_ok_without_dependencies
+  preconditions: 將 database.engine 換成連不上的位址（127.0.0.1:1）
+  action: GET /api/v1/health/live，不帶任何標頭
+  expected: HTTP 200，body {"status":"ok"}；liveness 不查任何依賴，DB 斷線也不得回非 200
+
+- id: TC-FUNC-HEALTH-002
+  req: REQ-NFR-008
+  category: FUNC
+  priority: P0
+  script: tests/api/test_health.py::test_health_ready_ok_when_db_at_head
+  preconditions: 本機 DB 可連且已 alembic upgrade head（CI backend job 先跑 upgrade）
+  action: GET /api/v1/health/ready
+  expected: HTTP 200，status ok、checks.db ok、checks.migration.ok true，db_revision 等於 code_head 且等於程式碼的 alembic head
+
+- id: TC-FUNC-HEALTH-003
+  req: REQ-NFR-008
+  category: FUNC
+  priority: P0
+  script: tests/api/test_health.py::test_health_ready_degraded_when_revision_mismatch
+  preconditions: DB 可連；把程式碼 head 換成不存在的 revision（monkeypatch code_head_revision）
+  action: GET /api/v1/health/ready
+  expected: HTTP 503，status degraded、checks.db ok、checks.migration.ok false，code_head 為被替換的值、db_revision 為 DB 實際值
+
+- id: TC-FUNC-HEALTH-004
+  req: REQ-NFR-008
+  category: FUNC
+  priority: P0
+  script: tests/api/test_health.py::test_health_ready_degraded_when_db_unreachable
+  preconditions: 將 database.engine 換成連不上的位址（connect_timeout 2 秒）
+  action: GET /api/v1/health/ready
+  expected: HTTP 503，status degraded、checks.db error、checks.migration.ok false、db_revision null；回應不含連線字串、主機、帳號、driver 名或 traceback
+
+- id: TC-FUNC-HEALTH-005
+  req: REQ-NFR-008
+  category: FUNC
+  priority: P0
+  script: tests/api/test_health.py::test_health_returns_ok
+  preconditions: 無
+  action: GET /api/v1/health
+  expected: HTTP 200，body 固定 {"status":"ok"}（維持既有行為，不查依賴）
+
+# ============================================================
 # 模組：AUTH／NFR — 身份與存取、資料隔離
 # ============================================================
 
@@ -614,6 +665,82 @@
   preconditions: DEBUG=false 環境
   action: 觸發一個500錯誤（如傳入異常參數導致未捕捉例外）
   expected: 回應內容不包含traceback或內部路徑資訊
+
+# --- REQ-AUTH-000 臨時 API 金鑰閘門（Phase 1～2 無認證期，Phase 3 換 JWT 後整組移除；規格見 docs/spec-gaps.md 第 5 節）---
+
+- id: TC-SEC-AUTH-000a
+  req: REQ-AUTH-000
+  category: SEC
+  priority: P0
+  script: tests/api/test_api_key_gate.py::test_missing_api_key_returns_401
+  preconditions: 後端以 API_KEY=correct-key 啟動；受保護端點以 GET /api/v1/auth/me 代表
+  action: GET /api/v1/auth/me，不帶 X-API-Key
+  expected: HTTP 401，body 固定 {"detail":"unauthorized"}
+
+- id: TC-SEC-AUTH-000b
+  req: REQ-AUTH-000
+  category: SEC
+  priority: P0
+  script: tests/api/test_api_key_gate.py::test_wrong_api_key_returns_same_401_body
+  preconditions: 同 000a
+  action: GET /api/v1/auth/me，X-API-Key 分別為錯誤值、空字串、正確金鑰的前綴
+  expected: 三者皆 HTTP 401，body 與 Content-Type 與 000a 完全相同，不透露「缺少」與「不符」的差異
+
+- id: TC-SEC-AUTH-000c
+  req: REQ-AUTH-000
+  category: SEC
+  priority: P0
+  script: tests/api/test_api_key_gate.py::test_correct_api_key_returns_200
+  preconditions: 同 000a
+  action: GET /api/v1/auth/me，X-API-Key 為正確金鑰
+  expected: HTTP 200，body {"user_id":1}（REQ-AUTH-001 固定 user_id）
+
+- id: TC-SEC-AUTH-000d
+  req: REQ-AUTH-000
+  category: SEC
+  priority: P0
+  script: tests/api/test_api_key_gate.py::test_health_endpoints_exempt_from_api_key
+  preconditions: 同 000a
+  action: 不帶 X-API-Key 分別 GET /api/v1/health、/api/v1/health/live、/api/v1/health/ready
+  expected: 三者皆不得為 401；/health 與 /health/live 為 200，/health/ready 依 DB 狀態為 200 或 503（豁免清單只有這三個）
+
+- id: TC-SEC-AUTH-000e
+  req: REQ-AUTH-000
+  category: SEC
+  priority: P0
+  script: tests/api/test_api_key_gate.py::test_startup_fails_without_api_key
+  preconditions: 移除環境變數 API_KEY，且不讀 .env
+  action: 建立 Settings（等同應用啟動），分別為 API_KEY 未設定、空字串、只有空白
+  expected: 皆拋 ValidationError，應用啟動失敗（fail closed）；程式碼不存在任何「不檢查」的旁路旗標
+
+# --- REQ-NFR-009 CORS 來源白名單（規格見 docs/spec-gaps.md 第 7 節）---
+
+- id: TC-SEC-CORS-001
+  req: REQ-NFR-009
+  category: SEC
+  priority: P0
+  script: tests/api/test_cors.py::test_preflight_from_allowed_origin_permits_x_api_key
+  preconditions: CORS_ALLOWED_ORIGINS 含 https://abowchen2025.github.io 與 http://localhost:5173
+  action: OPTIONS /api/v1/auth/me，Origin 為白名單來源，Access-Control-Request-Headers 為 x-api-key, content-type
+  expected: HTTP 200；Access-Control-Allow-Origin 等於該來源（非 *）；Allow-Headers 含 X-API-Key 與 Content-Type；Allow-Methods 為明確清單（含 GET，不含 *）；不含 Allow-Credentials
+
+- id: TC-SEC-CORS-002
+  req: REQ-NFR-009
+  category: SEC
+  priority: P0
+  script: tests/api/test_cors.py::test_preflight_from_unlisted_origin_is_rejected
+  preconditions: 同 CORS-001
+  action: OPTIONS /api/v1/auth/me，Origin 為 https://evil.example（不在白名單）
+  expected: HTTP 400，回應不含 Access-Control-Allow-Origin，瀏覽器不會送出正式請求
+
+- id: TC-SEC-CORS-003
+  req: REQ-NFR-009
+  category: SEC
+  priority: P0
+  script: tests/api/test_cors.py::test_actual_request_echoes_only_allowed_origin
+  preconditions: 同 CORS-001，帶正確 X-API-Key
+  action: GET /api/v1/auth/me，Origin 分別為兩個白名單來源與一個非白名單來源
+  expected: 白名單來源回 200 且 Allow-Origin 等於各自的 Origin；非白名單來源回應不含 Allow-Origin；任何情況不得回 *
 
 # ============================================================
 # 模組：E2E — 端到端流程（架構描述11.2 P0流程）
@@ -644,3 +771,8 @@
 #                     涵蓋12個功能模組＋AUTH/NFR＋E2E；分類依rachel-qa TC格式
 #                     （AUTH/SEC/FUNC/UI/E2E/EDGE/NEG/PERF）；script路徑供Claude Code
 #                     產生對應測試檔，req欄回追SRS+FS v1.1的REQ編號
+# v1.1 | 2026-09-22 | 依據改為 SRS+FS v1.2（YAML 引用的 50 個 REQ 已驗證全部能在 v1.2 找到對應，
+#                     內容不變）；新增 HEALTH 五條（TC-FUNC-HEALTH-001～005，REQ-NFR-008）、
+#                     REQ-AUTH-000 五條（TC-SEC-AUTH-000a～e）、CORS 三條（TC-SEC-CORS-001～003，
+#                     REQ-NFR-009）；實際 77 條（v1.0 檔頭寫 67 條，實際 64 條，本版只補新條目未追究差異）。
+#                     三個 REQ 目前只存在 docs/spec-gaps.md，待 SRS 補述

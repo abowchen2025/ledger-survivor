@@ -15,6 +15,28 @@ export const API_KEY_HEADER = "X-API-Key";
 /** schema.d.ts 裡的所有路徑，例如 "/api/v1/auth/me"（已含 /api/v1 前綴）。 */
 export type ApiPath = keyof paths;
 
+/** 由 resolvePath 把 {card_id} 之類的路徵參數代入後的路徑；只能經 resolvePath 產生。 */
+export type ResolvedPath = string & { readonly __resolved: unique symbol };
+
+/** 把 schema 路徑範本的 {參數} 代入實際值，例如 resolvePath("/api/v1/cards/{card_id}", { card_id: 3 })。 */
+export function resolvePath(template: ApiPath, params: Record<string, string | number>): ResolvedPath {
+  const out = template.replace(/\{(\w+)\}/g, (_, name: string) => {
+    if (!(name in params)) throw new Error(`resolvePath: missing path param ${name} for ${template}`);
+    return encodeURIComponent(String(params[name]));
+  });
+  return out as ResolvedPath;
+}
+
+/** 把查詢參數接到路徑後；undefined／null 的值略過。 */
+export function withQuery(path: ApiPath | ResolvedPath, query: Record<string, string | number | undefined | null>): ResolvedPath {
+  const search = new URLSearchParams();
+  for (const [key, value] of Object.entries(query)) {
+    if (value !== undefined && value !== null) search.set(key, String(value));
+  }
+  const qs = search.toString();
+  return (qs ? `${path}?${qs}` : path) as ResolvedPath;
+}
+
 export interface ApiConfig {
   /** 不含結尾斜線 */
   baseUrl: string;
@@ -98,7 +120,7 @@ async function parseBody(res: Response): Promise<unknown> {
  * 網路錯誤（含 CORS 預檢被擋）原樣丟出（TypeError）。
  * 呼叫端用 schema.d.ts 的 components["schemas"] 指定回傳型別（見 auth.ts 的用法）。
  */
-export async function apiFetch<T>(path: ApiPath, init: ApiRequestInit = {}): Promise<T> {
+export async function apiFetch<T>(path: ApiPath | ResolvedPath, init: ApiRequestInit = {}): Promise<T> {
   const { json, config, headers: extraHeaders, ...rest } = init;
   const { baseUrl, apiKey } = config ?? getApiConfig();
 

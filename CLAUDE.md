@@ -44,6 +44,7 @@
 - 路由（`routers/`）不放業務邏輯，一律進 `services/`
 - 新增業務 router 一律 include 進 `routers/protected.py` 的 `router`（REQ-AUTH-000 金鑰閘門掛在那一層），不要在 `main.py` 直接 include；只有 `routers/health.py` 三個端點豁免
 - 前端不直接呼叫 `fetch`，一律經 `frontend/src/api/client.ts`（統一帶 base URL 與 `X-API-Key`）；金鑰由使用者在設定頁輸入、存 localStorage，**不得**做成建置期變數或 GitHub Secret 嵌進產物（`docs/adr/0007`）；頁面在 catch 用 `useAuthFailureRedirect` 導向設定頁
+- 前端**不得**引用整個 `import.meta.env`，也不用 zustand 的 `devtools` middleware（它內部讀 `import.meta.env`）：Vite 會把含所有 `VITE_*` 的物件字面值嵌進 dist，`VITE_DEV_API_KEY` 就會外洩，`deploy-frontend.yml` 的哨兵檢查會擋下部署。本機驗法：`VITE_DEV_API_KEY=canary npm run build` 後 `grep -r canary dist` 必須沒有結果
 - 分期不建 `expenses` 記錄；期初卡債不進分類分析
 - 不得為了 CI 綠燈 skip／xfail 測試而不寫原因
 - 修改測試預期值要另開 `test:` commit 並在 PR 說明列出改了什麼、為什麼

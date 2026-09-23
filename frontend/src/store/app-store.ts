@@ -1,5 +1,6 @@
+// 不用 zustand 的 devtools middleware：它讀整個 import.meta.env，Vite 會把含所有 VITE_* 的物件字面值嵌進產物，
+// VITE_DEV_API_KEY 就會跟著進 dist（deploy-frontend.yml 的哨兵檢查會擋下）。見 api/api-key.ts 的說明。
 import { create } from "zustand";
-import { devtools } from "zustand/middleware";
 
 /**
  * Zustand store 結構示範。Phase 0 只放一個與業務無關的欄位，
@@ -15,12 +16,7 @@ export interface AppState {
   setReady: (ready: boolean) => void;
 }
 
-export const useAppStore = create<AppState>()(
-  devtools(
-    (set) => ({
-      ready: false,
-      setReady: (ready) => set({ ready }, false, "app/setReady"),
-    }),
-    { name: "app" },
-  ),
-);
+export const useAppStore = create<AppState>()((set) => ({
+  ready: false,
+  setReady: (ready) => set({ ready }),
+}));

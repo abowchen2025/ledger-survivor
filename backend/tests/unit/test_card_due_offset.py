@@ -3,13 +3,25 @@
 純函式測試，不碰資料庫。函式名稱與 docs/test_conditions_v1_1.yaml 的 script 欄位一致。
 """
 
+import json
 from datetime import date
 
 import pytest
 
 from app.services.cards import day_in_month, infer_due_month_offset
+from tests.conftest import FIXTURES_DIR
 
 pytestmark = pytest.mark.p0
+
+
+def test_due_offset_matches_shared_fixture() -> None:
+    """前後端共用 tests/fixtures/card_due_offset_cases.json（前端 src/lib/card-due-offset.test.ts 讀同一份）。"""
+    raw = json.loads((FIXTURES_DIR / "card_due_offset_cases.json").read_text(encoding="utf-8"))
+    cases = raw["cases"]
+    assert len(cases) >= 3
+    for case in cases:
+        got = infer_due_month_offset(case["statement_day"], case["due_day"])
+        assert got == case["expected"], f"{case['statement_day']}/{case['due_day']}: {case.get('note', '')}"
 
 
 def test_due_before_statement_next_month() -> None:

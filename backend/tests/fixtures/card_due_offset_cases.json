@@ -1,0 +1,13 @@
+{
+  "description": "REQ-CARD-002 繳款月偏移推算的唯一真相：繳款日 ≤ 結帳日 → 1（次月），繳款日 > 結帳日 → 0（同月）。後端 tests/unit/test_card_due_offset.py 與前端 src/lib/card-due-offset.test.ts 都讀這份；改案例只改這裡。",
+  "cases": [
+    { "statement_day": 27, "due_day": 15, "expected": 1, "note": "TC-EDGE-CARD-001" },
+    { "statement_day": 1, "due_day": 20, "expected": 0, "note": "TC-EDGE-CARD-002" },
+    { "statement_day": 31, "due_day": 5, "expected": 1, "note": "結帳 31：繳款日在前 → 次月" },
+    { "statement_day": 31, "due_day": 31, "expected": 1, "note": "結帳 31、繳款 31：相等視為 ≤ → 次月" },
+    { "statement_day": 15, "due_day": 15, "expected": 1, "note": "相等 → 次月" },
+    { "statement_day": 19, "due_day": 20, "expected": 0, "note": "只差一天仍是同月" },
+    { "statement_day": 1, "due_day": 1, "expected": 1, "note": "最小值相等" },
+    { "statement_day": 5, "due_day": 31, "expected": 0, "note": "繳款 31 在結帳 5 之後 → 同月" }
+  ]
+}

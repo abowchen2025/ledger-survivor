@@ -51,8 +51,13 @@ export default defineConfig({
     },
   },
   test: {
-    // 目前只有純函式測試（week.ts），不需要 DOM 環境；之後有元件測試再加 jsdom。
+    // 純函式測試（*.test.ts）用 node；元件測試（*.test.tsx）在檔頭以 `// @vitest-environment jsdom` 切到 jsdom。
     environment: "node",
+    // forks 在這台 Windows 機器上啟動 jsdom worker 會逾時（>60s），threads 約 20s 可用
+    pool: "threads",
+    // @testing-library/react 依 afterEach 全域自動 cleanup，沒有它每個測試會殘留上一個測試的 DOM
+    globals: true,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
+    setupFiles: ["src/test/setup.ts"],
   },
 });

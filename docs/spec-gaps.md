@@ -168,7 +168,7 @@
 | 項目 | 規格（已實作） | 待 SRS 補述 |
 |---|---|---|
 | 所屬月份 | 依**週歸屬規則**（`week_rule.week_belongs_to_month`）判定，不依日曆月。2026-09-29 屬 2026-W40，週四 10/1，歸 10 月，所以看 10 月有沒有結算，不是 9 月。理由：結算是行為時鐘的概念，一週永遠不切割；用日曆月判定，已結算的 9 月可能被 9/29 的補登偷偷改掉，而那筆其實屬於 10 月的關卡。實作在 `services/settlement.py::game_month_of`，不另寫一套 | REQ-EXPENSE-005「已結算月份」改為「該筆花費依 REQ-WEEK-001 所屬的月份」 |
-| 「已結算」定義 | 該月在 `reward_ledger` 有紀錄。月結功能 Phase 3 才做，這個檢查現在就有；測試直接在 DB 插入 `reward_ledger` 列。**取消結算＝刪除該列**（表上沒有取消旗標；ABow 原文「有紀錄且未取消」——若 Phase 3 決定改為旗標欄位，只需改 `is_month_settled`，不影響呼叫端） | 4.9 月結模組寫清楚「取消結算」對 `reward_ledger` 做什麼 |
+| 「已結算」定義 | 該月在 `reward_ledger` 有紀錄。月結功能 Phase 3 才做，這個檢查現在就有；測試直接在 DB 插入 `reward_ledger` 列。**取消結算＝刪除該列**。這是 schema 逼出來的唯一解：`reward_ledger` 有 `unique(user_id, month)`，若用旗標標記失效，重新結算時會撞約束。REQ-SETTLE-003 寫「刪除或標記舊紀錄失效」二擇一，因 unique 約束只能刪除（2026-09-23 ABow 確認；其原文「有紀錄且未取消」暗示有旗標，為誤寫） | REQ-SETTLE-003 收斂成單一寫法：「取消結算須刪除該月 `reward_ledger` 紀錄」 |
 | PUT 改日期 | 舊日期與新日期所屬的月份**都要檢查**，任一已結算就 409——從已結算月份移出，和移入已結算月份，都會改變該月的結果。DELETE 檢查原日期 | REQ-EXPENSE-005 加註 |
 | 回應 | 409 `MONTH_SETTLED`，message 帶月份並提示「請先取消結算」，例：`2026-10 已結算，請先取消結算` | 4.5 API 表 409 那格補文案 |
 | 測試覆蓋 | `tests/api/test_expenses.py`：日曆月與遊戲月不同的補登（`test_settlement_uses_game_month_not_calendar_month`）、PUT 移入（`test_put_moving_into_settled_month_returns_409`）、PUT 移出／同月改備註／DELETE（`test_put_moving_out_of_settled_month_returns_409`）、未結算月份正常寫入（`test_unsettled_month_allows_create_update_delete`）、TC-NEG-EXPENSE-006 | 測試條件 v1.2 補這四條 EDGE TC |

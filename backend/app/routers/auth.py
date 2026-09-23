@@ -6,13 +6,14 @@ GET /auth/me：回傳目前請求被視為的 user_id（REQ-AUTH-001：固定 1�
 不在 SRS 裡，缺口記在 docs/spec-gaps.md 第 5 節。
 """
 
-from fastapi import APIRouter, Request
+from fastapi import APIRouter
 
+from app.deps import CurrentUserId
 from app.schemas.auth import MeResponse
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
 @router.get("/me", response_model=MeResponse)
-def me(request: Request) -> MeResponse:
-    return MeResponse(user_id=request.app.state.settings.default_user_id)
+def me(user_id: CurrentUserId) -> MeResponse:
+    return MeResponse(user_id=user_id)

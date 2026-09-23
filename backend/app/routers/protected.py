@@ -7,7 +7,7 @@
 
 from fastapi import APIRouter, Depends
 
-from app.routers import auth, cards, categories
+from app.routers import auth, cards, categories, income
 from app.security import require_api_key
 
 router = APIRouter(dependencies=[Depends(require_api_key)])
@@ -15,3 +15,4 @@ router = APIRouter(dependencies=[Depends(require_api_key)])
 router.include_router(auth.router)
 router.include_router(categories.router)
 router.include_router(cards.router)
+router.include_router(income.router)

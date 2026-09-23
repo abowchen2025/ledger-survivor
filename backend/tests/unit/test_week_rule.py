@@ -1,7 +1,7 @@
 """週歸屬規則單元測試（REQ-WEEK-001、REQ-WEEK-002、REQ-WEEK-005）。
 
 所有日期資料一律來自 tests/fixtures/week_cases.json，測試碼不寫死任何日期。
-函式名稱與 docs/test_conditions_v1_0.yaml 的 script 欄位一致。
+函式名稱與 docs/test_conditions_v1_1.yaml 的 script 欄位一致。
 """
 
 from datetime import date, timedelta

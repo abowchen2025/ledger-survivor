@@ -1,5 +1,20 @@
+import { useState } from "react";
+import { useLocation } from "react-router-dom";
+
+import type { AuthRedirectState } from "@/api/auth-guard";
+import { ApiKeyForm } from "@/components/ApiKeyForm";
+import { ApiStatus } from "@/components/ApiStatus";
 import { PageTitle } from "@/components/layout/PageTitle";
 
 export default function SettingsPage() {
-  return <PageTitle>設定</PageTitle>;
+  const [refreshToken, setRefreshToken] = useState(0);
+  const state = useLocation().state as Partial<AuthRedirectState> | null;
+
+  return (
+    <>
+      <PageTitle>設定</PageTitle>
+      <ApiKeyForm reason={state?.reason} onChange={() => setRefreshToken((n) => n + 1)} />
+      <ApiStatus refreshToken={refreshToken} />
+    </>
+  );
 }

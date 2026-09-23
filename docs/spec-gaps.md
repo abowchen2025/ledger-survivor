@@ -46,26 +46,32 @@
 | 同上：`achievements` | `code VARCHAR(50)`、`unlocked_at TIMESTAMPTZ DEFAULT now()` | 補型別 |
 | 金額精度 | 所有金額 `NUMERIC(12,2)`，保留兩位小數（分期每期金額除不盡時用到） | 第三章加一句金額型別統一 `NUMERIC(12,2)` |
 
-### 5. 無認證期的臨時 API 金鑰閘門（REQ-AUTH-000，2026-09-21 ABow 決定；本輪只記錄，Phase 1 實作）
+### 5. 無認證期的臨時 API 金鑰閘門（REQ-AUTH-000，2026-09-21 ABow 決定；**已實作**，2026-09-22，分支 `phase-1-auth-cors`）
 
 **為什麼是規格缺口**：REQ-AUTH-* 排在 Phase 3。Phase 1～2 之間後端部署在 Railway 的公開網址上，沒有任何認證，而這段期間會用真實財務資料連續記帳。repo 改為 public（2026-09-21 決定，見架構描述 10.1）不改變這件事，只是讓網址更容易被找到。原規格漏掉了這段「無認證期」。
 
 **在 REQ-AUTH-000 實作完成之前，部署到 Railway 的環境只能放測試資料，不得輸入任何真實花費。Phase 1 開發期間用本機環境與假資料。**
 
-| 項目 | 規格（待實作） | 待 SRS 補述 |
+**實作位置**：`backend/app/config.py`（`api_key` 必填、空值拒絕）、`backend/app/security.py`（`require_api_key`）、`backend/app/routers/protected.py`（router 層級掛 dependency，所有業務 router 一律 include 進來）、`backend/tests/api/test_api_key_gate.py`。
+
+| 項目 | 規格（已實作） | 待 SRS 補述 |
 |---|---|---|
 | 編號／階段／優先 | `REQ-AUTH-000`，Phase 1，P0 | 4.x 認證模組（或第二章 RBAC）新增此條，放在 REQ-AUTH-001 之前，標註「臨時，Phase 3 移除」 |
-| 後端 | 讀環境變數 `API_KEY`；以 FastAPI dependency 檢查請求標頭 `X-API-Key`，套用到 `/api/v1` 下所有路由 | 條文 |
+| 後端 | 讀環境變數 `API_KEY`；以 FastAPI dependency 檢查請求標頭 `X-API-Key`，掛在 `routers/protected.py` 的 **router 層級**（不逐個端點掛，新增端點不會漏），套用到 `/api/v1` 下所有路由。比對用 `secrets.compare_digest`（常數時間） | 條文 |
 | 失敗回應 | 標頭缺少或不符**一律** `401`，錯誤訊息固定同一句（例如 `{"detail": "unauthorized"}`），不透露「缺少」與「不符」的差異，避免用回應內容探測 | 條文 |
-| 豁免 | `GET /api/v1/health` 不檢查，讓 Railway healthcheck 能用 | 條文 |
-| 未設定 `API_KEY` | 環境變數缺少或為空時，後端啟動即失敗（fail closed），不得退化成「不檢查」；**不設任何旁路旗標**，程式碼裡不存在「不檢查」的分支。本機開發由 `.env.example` 附一個開發用值（`API_KEY=dev-local-only-not-a-secret`），本機一樣走完整檢查路徑；前端 `.env.example` 對應 `VITE_API_KEY` 同值 | 條文（2026-09-21 ABow 確認 fail closed、無旁路旗標） |
-| 前端 | 建置期環境變數 `VITE_API_KEY`，所有對 `/api/v1` 的請求帶 `X-API-Key` | 條文 |
-| 金鑰存放 | GitHub Secrets（`VITE_API_KEY`，給 `deploy-frontend.yml` 建置用）與 Railway Variables（`API_KEY`），不進版控；`.env.example` 只列名稱 | README 與 deployment-setup 補步驟 |
-| 安全邊界（必須明寫） | 金鑰嵌在前端 build 產物裡，任何人打開 devtools 都看得到。它擋的是隨機掃描與爬蟲，不是針對性攻擊 | 條文加註 |
+| 豁免 | 只有三個：`GET /api/v1/health`、`/api/v1/health/live`、`/api/v1/health/ready`（`routers/health.py` 不經 protected router），讓 Railway healthcheck 能用。其餘一律檢查，含未來所有業務端點 | 條文（2026-09-22 ABow 指定豁免清單只有這三個） |
+| 未設定 `API_KEY` | 環境變數缺少或為空時，後端啟動即失敗（fail closed），不得退化成「不檢查」；**不設任何旁路旗標**，程式碼裡不存在「不檢查」的分支。本機開發由 `.env.example` 附一個開發用值（`API_KEY=dev-local-only-not-a-secret`），本機一樣走完整檢查路徑；前端 `.env.example` 的 `VITE_DEV_API_KEY` 同值（只在 dev build 生效） | 條文（2026-09-21 ABow 確認 fail closed、無旁路旗標） |
+| 前端 | 金鑰由使用者在設定頁輸入一次、存瀏覽器 `localStorage`（鍵 `ledger-survivor.api-key`），`src/api/client.ts` 從 `src/api/api-key.ts` 取值後所有對 `/api/v1` 的請求帶 `X-API-Key`。本機 dev build 可用 `VITE_DEV_API_KEY` 作預設值，`localStorage` 優先；production build 一律忽略該變數。沒有金鑰時不送請求、丟 `ApiKeyMissingError`，其他頁面遇到它或 401 導向設定頁（`src/api/auth-guard.ts`）。決策見 `docs/adr/0007` | 條文（2026-09-23 ABow 決定改為使用者輸入；原「建置期 `VITE_API_KEY`」作廢） |
+| 金鑰存放 | 只有兩處：Railway Variables（`API_KEY`）與使用者瀏覽器的 `localStorage`。不進版控、不進 build 產物、**沒有** GitHub Secret（`deploy-frontend.yml` 建完後 grep `dist/`，出現金鑰或 `VITE_DEV_API_KEY` 就失敗）。`.env.example` 只放開發用值 | README 與 deployment-setup 已補步驟 |
+| 安全邊界（必須明寫） | 金鑰不在產物裡；repo 與 Pages 公開也拿不到。它擋隨機掃描、爬蟲與「照 repo 找到 Pages 再讀 bundle」的人，不擋針對性攻擊（裝置被拿走、同源 XSS 讀 `localStorage`）。代價：每個裝置第一次要輸入一次 | 條文加註 |
 | 移除時機 | Phase 3 導入 JWT（REQ-AUTH-001 起）後整套移除：dependency、環境變數、前端標頭、相關 TC | 條文加註；Phase 3 的驗收條件加「REQ-AUTH-000 已移除」 |
-| 測試條件（建議） | `TC-SEC-AUTH-000a`：無 `X-API-Key` → 401；`TC-SEC-AUTH-000b`：錯誤金鑰 → 401 且回應 body 與 000a 完全相同；`TC-SEC-AUTH-000c`：正確金鑰 → 200；`TC-SEC-AUTH-000d`：`/api/v1/health` 無金鑰 → 200；`TC-SEC-AUTH-000e`：`API_KEY` 未設定 → 應用啟動失敗。script 建議 `tests/api/test_api_key_gate.py` | test_conditions 新增五條，req 回追 REQ-AUTH-000 |
+| 測試條件（已進 `docs/test_conditions_v1_1.yaml`） | `TC-SEC-AUTH-000a`：無 `X-API-Key` → 401；`TC-SEC-AUTH-000b`：錯誤金鑰 → 401 且回應 body 與 000a 完全相同；`TC-SEC-AUTH-000c`：正確金鑰 → 200；`TC-SEC-AUTH-000d`：三個 health 端點無金鑰 → 非 401；`TC-SEC-AUTH-000e`：`API_KEY` 未設定 → 應用啟動失敗。script `tests/api/test_api_key_gate.py` | req 回追 REQ-AUTH-000 |
+| **新增缺口：驗證用受保護端點**（2026-09-23 ABow 決定：**保留**） | SRS 在 Phase 1～2 沒有任何非 health 端點，閘門無法用 curl／前端驗證「正確金鑰回 200」。新增 `GET /api/v1/auth/me` → `200 {"user_id": 1}`（`routers/auth.py`，值取 `settings.default_user_id`，對應 REQ-AUTH-001「所有請求視為 user_id=1」）。**Phase 3 改為回傳 JWT 內的 `user_id`**，端點不刪 | SRS 4.x 認證模組補這條 API，標註 Phase 3 行為 |
+| **新增缺口：OpenAPI 文件依 `DEBUG` 開關**（2026-09-23 ABow 決定） | `/openapi.json`、`/docs`、`/redoc` 在 `/api/v1` 之外，不受金鑰檢查，改由 `DEBUG` 控制：`DEBUG=false`（Railway）三個端點不存在（404）；`DEBUG=true`（本機，`.env.example` 預設）全開，`npm run gen:api` 讀本機 `127.0.0.1:8765` 不受影響。理由不是保密（repo 公開，schema 推得出來），是不在公開網址放互動式介面。OpenAPI 以 `securitySchemes.ApiKeyAuth` 宣告，受保護操作帶 `security`，health 沒有；`X-API-Key` 不會變成每個操作的參數。測試 `TC-SEC-DOCS-001`（`tests/api/test_api_key_gate.py::test_openapi_docs_closed_when_debug_false`） | 第五章 5.2 加一列；`DEBUG` 同時控制 traceback（REQ-NFR-004）與文件端點，條文要寫清楚 |
+| **新增缺口：401 回應格式** | `401`，body 固定 `{"detail": "unauthorized"}`，`Content-Type: application/json`；不帶 `WWW-Authenticate`（沒有瀏覽器原生驗證流程要觸發） | 條文；日後 API 錯誤格式統一時一起定 |
+| **新增缺口：CORS 預檢不經閘門** | 瀏覽器預檢 `OPTIONS` 不帶 `X-API-Key`，由 `CORSMiddleware` 在路由前回應，不會被 401（`tests/api/test_cors.py::test_preflight_for_health_does_not_require_api_key`）。金鑰的傳遞方式（自訂標頭）與 CORS 的關係見第 7 節 | 條文加註 |
 
-### 6. 健康檢查端點（REQ-NFR-008，2026-09-21 ABow 決定；已實作於 Phase 0b 收尾）
+### 6. 健康檢查端點（REQ-NFR-008，2026-09-21 ABow 決定；**已實作**於 Phase 0b 收尾，測試條件 2026-09-22 進 `docs/test_conditions_v1_1.yaml`）
 
 **為什麼是規格缺口**：健康檢查現在是部署的守門員（Railway healthcheck 指向它，決定新版本是否切流量），是有行為、可測試的需求，不該只活在程式碼裡。SRS 目前沒有任何條文定義 health 端點。決策理由見 `docs/adr/0006`。
 
@@ -78,6 +84,27 @@
 | 不洩漏 | readiness 回應不得含連線字串、主機、帳號、例外文字；細節只寫伺服器 log | 條文（呼應 REQ-NFR-004） |
 | 逾時 | DB 連線逾時 5 秒（engine `connect_timeout=5`），readiness 最慢約 5 秒回 503，不得無限等 | 條文 |
 | 部署綁定 | Railway Healthcheck Path 指向 `/api/v1/health/ready`；migration 沒跑或跑失敗的部署不得切流量 | 條文；架構描述第 9 節 Phase 0 驗收「Railway /health 回 200」改為「/health/ready 回 200」 |
-| 測試條件（已實作於 `tests/api/test_health.py`） | `TC-FUNC-HEALTH-001` live 在 DB 不可達時仍 200；`002` ready 在 DB 到 head 時 200 且 `db_revision == code_head`；`003` revision 不符 → 503 degraded、`migration.ok=false`；`004` DB 不可達 → 503、`checks.db=error`、回應不含連線細節；`005` `/health` 維持 `{"status":"ok"}` | test_conditions 新增五條，req 回追 REQ-NFR-008 |
+| 測試條件（已實作於 `tests/api/test_health.py`，已進 `docs/test_conditions_v1_1.yaml`） | `TC-FUNC-HEALTH-001` live 在 DB 不可達時仍 200；`002` ready 在 DB 到 head 時 200 且 `db_revision == code_head`；`003` revision 不符 → 503 degraded、`migration.ok=false`；`004` DB 不可達 → 503、`checks.db=error`、回應不含連線細節；`005` `/health` 維持 `{"status":"ok"}` | req 回追 REQ-NFR-008 |
+| 與 REQ-AUTH-000 的關係 | 三個端點是金鑰閘門的**唯一**豁免（`TC-SEC-AUTH-000d`） | 條文加註 |
 
-小節 1～4 對應 2026-09-20 回覆的第 1～4 點；小節 5～6 為 2026-09-21 新增。
+### 7. CORS 來源白名單（REQ-NFR-009，2026-09-22 ABow 決定規格；**已實作**，分支 `phase-1-auth-cors`）
+
+**為什麼是規格缺口**：前端在 GitHub Pages（`https://abowchen2025.github.io`）、後端在 Railway，是跨來源；REQ-AUTH-000 用自訂標頭 `X-API-Key`，瀏覽器對每個跨來源請求都會先送 `OPTIONS` 預檢。SRS 第五章沒有任何 CORS 條文。編號 `REQ-NFR-009` 是本檔暫定，供 `docs/test_conditions_v1_1.yaml` 的 `req` 欄回追，待 ABow 帶回 SRS 時確認或改號。
+
+**實作位置**：`backend/app/config.py`（`cors_allowed_origins` 解析與驗證）、`backend/app/main.py`（`CORSMiddleware`）、`backend/tests/api/test_cors.py`。
+
+| 項目 | 目前實作 | 待 SRS 補述 |
+|---|---|---|
+| 編號／階段／優先 | `REQ-NFR-009`，Phase 1，P0 | 第五章 5.2 新增此列 |
+| 來源清單 | 環境變數 `CORS_ALLOWED_ORIGINS`，逗號分隔，`config.py` 解析成 list。每一項必須是 `scheme://host[:port]`：含 `*`、帶路徑（含結尾 `/`）、缺 scheme、非 http/https 都在**啟動時**拒絕（ValidationError），不靜靜失效。未設定 → 空清單，不允許任何跨來源 | 條文 |
+| 值 | 本機 `.env.example`：`http://localhost:5173,http://127.0.0.1:5173`；Railway：`https://abowchen2025.github.io`（只有 scheme + host，Origin 標頭不帶路徑） | README／deployment-setup |
+| 禁止 | `allow_origins=["*"]`；`allow_methods=["*"]`、`allow_headers=["*"]` | 條文 |
+| 憑證 | `allow_credentials=False`（用標頭不是 cookie） | 條文 |
+| 方法 | `GET, POST, PUT, DELETE`（SRS API 實際用到的；預檢 `OPTIONS` 由中介層處理） | 條文；新增 PATCH 端點時要一起加 |
+| 標頭 | `X-API-Key`（必含，否則預檢擋掉正式請求）、`Content-Type` | 條文 |
+| 預檢結果 | 白名單來源 → `200`，`Access-Control-Allow-Origin` 等於該來源；非白名單 → `400 Disallowed CORS origin`，不含 `Allow-Origin`（Starlette 仍附靜態的 `Allow-Methods`／`Allow-Headers`，瀏覽器只看 `Allow-Origin`） | 條文與回應格式 |
+| 測試條件（已進 `docs/test_conditions_v1_1.yaml`） | `TC-SEC-CORS-001` 白名單預檢帶 `X-API-Key` 通過；`002` 非白名單預檢被拒；`003` 正式請求只對白名單來源回 `Allow-Origin` | req 回追 REQ-NFR-009 |
+| **新增缺口：前端建置期變數** | 只有 `VITE_API_BASE_URL`（只到 host[:port]，不含 `/api/v1`），Pages 由同名 GitHub Secret 注入，缺了 build 失敗。`VITE_DEV_API_KEY` 只是本機 dev 預設值，production build 忽略。`frontend/src/api/client.ts` 是後端呼叫唯一入口（帶 base URL 與 `X-API-Key`，非 2xx 丟 `ApiError`）。金鑰本身見第 5 節與 `docs/adr/0007` | 架構描述 6.x 或 SRS 第五章補「前端設定」；README 已列 |
+| **新增缺口：設定頁金鑰欄位與後端連線狀態** | `frontend/src/components/ApiKeyForm.tsx`：金鑰輸入、儲存到 `localStorage`、清除、顯示目前來源（已儲存／開發預設／尚未設定），從其他頁被導過來時顯示原因；`ApiStatus.tsx` 打 `GET /auth/me` 顯示連線結果（正常／尚未設定金鑰／401／連不上），存完金鑰立刻重查 | SRS 4.x 設定頁畫面補「API 金鑰」與「後端連線」兩個區塊（Phase 3 移除金鑰區塊） |
+
+小節 1～4 對應 2026-09-20 回覆的第 1～4 點；小節 5～6 為 2026-09-21 新增；小節 7 為 2026-09-22 新增。第 5～7 節標「已實作」但**不刪任何一列**，等新版 SRS 回來再一起清（2026-09-22 ABow 指示）。

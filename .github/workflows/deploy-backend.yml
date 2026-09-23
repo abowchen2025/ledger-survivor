@@ -46,6 +46,8 @@ jobs:
     env:
       DATABASE_URL: postgresql+psycopg://ledger:ledger@localhost:5432/ledger_survivor
       TZ: Asia/Taipei
+      # REQ-AUTH-000 fail closed：沒有 API_KEY 連 alembic（import app.config）都起不來。CI 用固定假值，不是機密。
+      API_KEY: ci-only-not-a-secret
     steps:
       - uses: actions/checkout@v4
 

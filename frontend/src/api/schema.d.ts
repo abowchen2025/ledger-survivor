@@ -72,10 +72,494 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/category-groups": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Category Groups */
+        get: operations["list_category_groups_api_v1_category_groups_get"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/categories": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Categories */
+        get: operations["list_categories_api_v1_categories_get"];
+        put?: never;
+        /** Create Category */
+        post: operations["create_category_api_v1_categories_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/categories/{category_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Category */
+        put: operations["update_category_api_v1_categories__category_id__put"];
+        post?: never;
+        /** Delete Category */
+        delete: operations["delete_category_api_v1_categories__category_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cards": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Cards */
+        get: operations["list_cards_api_v1_cards_get"];
+        put?: never;
+        /** Create Card */
+        post: operations["create_card_api_v1_cards_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/cards/{card_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Card */
+        put: operations["update_card_api_v1_cards__card_id__put"];
+        post?: never;
+        /** Delete Card */
+        delete: operations["delete_card_api_v1_cards__card_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/months/{month}/income": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get Month Income */
+        get: operations["get_month_income_api_v1_months__month__income_get"];
+        /** Put Month Income */
+        put: operations["put_month_income_api_v1_months__month__income_put"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extra-incomes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Extra Incomes */
+        get: operations["list_extra_incomes_api_v1_extra_incomes_get"];
+        put?: never;
+        /** Create Extra Income */
+        post: operations["create_extra_income_api_v1_extra_incomes_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/extra-incomes/{row_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Extra Income */
+        put: operations["update_extra_income_api_v1_extra_incomes__row_id__put"];
+        post?: never;
+        /** Delete Extra Income */
+        delete: operations["delete_extra_income_api_v1_extra_incomes__row_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recurring-expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Recurring Expenses */
+        get: operations["list_recurring_expenses_api_v1_recurring_expenses_get"];
+        put?: never;
+        /** Create Recurring Expense */
+        post: operations["create_recurring_expense_api_v1_recurring_expenses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/recurring-expenses/{row_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Recurring Expense */
+        put: operations["update_recurring_expense_api_v1_recurring_expenses__row_id__put"];
+        post?: never;
+        /** Delete Recurring Expense */
+        delete: operations["delete_recurring_expense_api_v1_recurring_expenses__row_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expenses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List Expenses */
+        get: operations["list_expenses_api_v1_expenses_get"];
+        put?: never;
+        /** Create Expense */
+        post: operations["create_expense_api_v1_expenses_post"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/expenses/{expense_id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /** Update Expense */
+        put: operations["update_expense_api_v1_expenses__expense_id__put"];
+        post?: never;
+        /** Delete Expense */
+        delete: operations["delete_expense_api_v1_expenses__expense_id__delete"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
     schemas: {
+        /** CardCreate */
+        CardCreate: {
+            /** Name */
+            name: string;
+            /** Bank */
+            bank: string;
+            /** Last4 */
+            last4: string;
+            /** Statement Day */
+            statement_day: number;
+            /** Due Day */
+            due_day: number;
+            /** Due Month Offset */
+            due_month_offset?: (0 | 1) | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Opening Billed Unpaid
+             * @default 0
+             */
+            opening_billed_unpaid: number;
+            /**
+             * Opening Unbilled
+             * @default 0
+             */
+            opening_unbilled: number;
+            /** Opening As Of */
+            opening_as_of?: string | null;
+        };
+        /** CardOut */
+        CardOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Bank */
+            bank: string;
+            /** Last4 */
+            last4: string;
+            /** Statement Day */
+            statement_day: number;
+            /** Due Day */
+            due_day: number;
+            /** Due Month Offset */
+            due_month_offset: number;
+            /** Opening Billed Unpaid */
+            opening_billed_unpaid: number;
+            /** Opening Unbilled */
+            opening_unbilled: number;
+            /** Opening As Of */
+            opening_as_of: string | null;
+            /** Color */
+            color: string | null;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /**
+         * CardUpdate
+         * @description PUT 整筆取代。期初卡債欄位（opening_*）不在此：建立後鎖定不可再改，送了會因 extra=forbid 回 400。
+         *
+         *     due_month_offset：有給 → 覆寫；沒給且結帳日／繳款日有變 → 依新值重新推算（TC-NEG-CARD-003）；
+         *     沒給且來源欄位沒變 → 維持原值。
+         */
+        CardUpdate: {
+            /** Name */
+            name: string;
+            /** Bank */
+            bank: string;
+            /** Last4 */
+            last4: string;
+            /** Statement Day */
+            statement_day: number;
+            /** Due Day */
+            due_day: number;
+            /** Due Month Offset */
+            due_month_offset?: (0 | 1) | null;
+            /** Color */
+            color?: string | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /**
+         * CategoryCreate
+         * @description SRS 4.7 二級分類欄位規格表。
+         */
+        CategoryCreate: {
+            /** Name */
+            name: string;
+            /** Group Id */
+            group_id: number;
+            /** Sort Order */
+            sort_order?: number | null;
+        };
+        /** CategoryGroupOut */
+        CategoryGroupOut: {
+            /** Id */
+            id: number;
+            /** Code */
+            code: string;
+            /** Name */
+            name: string;
+            /** Necessity */
+            necessity: string;
+            /** Counts Toward Target */
+            counts_toward_target: boolean;
+            /** Benchmark Min Pct */
+            benchmark_min_pct: string | null;
+            /** Benchmark Max Pct */
+            benchmark_max_pct: string | null;
+            /** Sort Order */
+            sort_order: number;
+            /** Is System */
+            is_system: boolean;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /** CategoryOut */
+        CategoryOut: {
+            /** Id */
+            id: number;
+            /** Group Id */
+            group_id: number;
+            /** Name */
+            name: string;
+            /** Is System */
+            is_system: boolean;
+            /** Sort Order */
+            sort_order: number;
+            /** Is Active */
+            is_active: boolean;
+        };
+        /**
+         * CategoryUpdate
+         * @description PUT 為整筆取代：name／group_id 必填；is_active 可用來停用／重新啟用。
+         */
+        CategoryUpdate: {
+            /** Name */
+            name: string;
+            /** Group Id */
+            group_id: number;
+            /** Sort Order */
+            sort_order?: number | null;
+            /**
+             * Is Active
+             * @default true
+             */
+            is_active: boolean;
+        };
+        /** ErrorBody */
+        ErrorBody: {
+            /** Code */
+            code: string;
+            /** Message */
+            message: string;
+            /** Fields */
+            fields?: {
+                [key: string]: string;
+            } | null;
+        };
+        /** ErrorResponse */
+        ErrorResponse: {
+            error: components["schemas"]["ErrorBody"];
+        };
+        /** ExpenseCreate */
+        ExpenseCreate: {
+            /** Amount */
+            amount: number;
+            /** Item */
+            item: string;
+            /** Category Id */
+            category_id: number;
+            /**
+             * Payment Method
+             * @enum {string}
+             */
+            payment_method: "cash" | "credit_card" | "mobile_pay" | "transfer";
+            /** Card Id */
+            card_id?: number | null;
+            /** Note */
+            note?: string | null;
+            /** Date */
+            date?: string | null;
+        };
+        /** ExpenseOut */
+        ExpenseOut: {
+            /** Id */
+            id: number;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+            /** Amount */
+            amount: number;
+            /** Item */
+            item: string;
+            /** Category Id */
+            category_id: number;
+            /**
+             * Payment Method
+             * @enum {string}
+             */
+            payment_method: "cash" | "credit_card" | "mobile_pay" | "transfer";
+            /** Card Id */
+            card_id: number | null;
+            /** Note */
+            note: string | null;
+        };
+        /**
+         * ExpenseUpdate
+         * @description PUT 整筆取代：date 必填（「預設今天」只適用於新增）。
+         */
+        ExpenseUpdate: {
+            /** Amount */
+            amount: number;
+            /** Item */
+            item: string;
+            /** Category Id */
+            category_id: number;
+            /**
+             * Payment Method
+             * @enum {string}
+             */
+            payment_method: "cash" | "credit_card" | "mobile_pay" | "transfer";
+            /** Card Id */
+            card_id?: number | null;
+            /** Note */
+            note?: string | null;
+            /**
+             * Date
+             * Format: date
+             */
+            date: string;
+        };
+        /** ExtraIncomeCreate */
+        ExtraIncomeCreate: {
+            /** Month */
+            month: string;
+            /** Amount */
+            amount: number;
+            /** Name */
+            name: string;
+        };
+        /** ExtraIncomeOut */
+        ExtraIncomeOut: {
+            /** Id */
+            id: number;
+            /** Month */
+            month: string;
+            /** Amount */
+            amount: number;
+            /** Name */
+            name: string;
+        };
+        /**
+         * ExtraIncomeUpdate
+         * @description PUT 整筆取代，欄位同新增。
+         */
+        ExtraIncomeUpdate: {
+            /** Month */
+            month: string;
+            /** Amount */
+            amount: number;
+            /** Name */
+            name: string;
+        };
         /**
          * HealthResponse
          * @description GET /health 與 /health/live：只表示程序活著。
@@ -104,6 +588,34 @@ export interface components {
             /** Code Head */
             code_head: string;
         };
+        /**
+         * MonthIncomeOut
+         * @description GET／PUT /months/{month}/income 的回應。
+         *
+         *     - 該月有紀錄：三個值取自該月，``inherited_from`` 為 null。
+         *     - 該月無紀錄：``salary``／``savings_target`` 取上一有紀錄月份的值，``inherited_from`` 填那個月份（讀取時推算、不寫入）。
+         *     - 任何月份都沒有紀錄：兩個金額為 null，``inherited_from`` 為 null（前端顯示「尚未設定本月月薪」）。
+         */
+        MonthIncomeOut: {
+            /** Month */
+            month: string;
+            /** Salary */
+            salary: number | null;
+            /** Savings Target */
+            savings_target: number | null;
+            /** Inherited From */
+            inherited_from: string | null;
+        };
+        /** MonthIncomeUpdate */
+        MonthIncomeUpdate: {
+            /** Salary */
+            salary: number;
+            /**
+             * Savings Target
+             * @default 0
+             */
+            savings_target: number;
+        };
         /** ReadinessChecks */
         ReadinessChecks: {
             /**
@@ -124,6 +636,44 @@ export interface components {
              */
             status: "ok" | "degraded";
             checks: components["schemas"]["ReadinessChecks"];
+        };
+        /** RecurringExpenseCreate */
+        RecurringExpenseCreate: {
+            /** Name */
+            name: string;
+            /** Amount */
+            amount: number;
+            /** Start Month */
+            start_month: string;
+            /** End Month */
+            end_month?: string | null;
+        };
+        /** RecurringExpenseOut */
+        RecurringExpenseOut: {
+            /** Id */
+            id: number;
+            /** Name */
+            name: string;
+            /** Amount */
+            amount: number;
+            /** Start Month */
+            start_month: string;
+            /** End Month */
+            end_month: string | null;
+        };
+        /**
+         * RecurringExpenseUpdate
+         * @description PUT 整筆取代，欄位同新增。
+         */
+        RecurringExpenseUpdate: {
+            /** Name */
+            name: string;
+            /** Amount */
+            amount: number;
+            /** Start Month */
+            start_month: string;
+            /** End Month */
+            end_month?: string | null;
         };
     };
     responses: never;
@@ -219,6 +769,821 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["MeResponse"];
+                };
+            };
+        };
+    };
+    list_category_groups_api_v1_category_groups_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryGroupOut"][];
+                };
+            };
+        };
+    };
+    list_categories_api_v1_categories_get: {
+        parameters: {
+            query?: {
+                group_id?: number | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"][];
+                };
+            };
+        };
+    };
+    create_category_api_v1_categories_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_category_api_v1_categories__category_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CategoryUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_category_api_v1_categories__category_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                category_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description 已被花費引用，改為停用並回傳資料 */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CategoryOut"];
+                };
+            };
+            /** @description 從未被引用，已真刪除 */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_cards_api_v1_cards_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardOut"][];
+                };
+            };
+        };
+    };
+    create_card_api_v1_cards_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_card_api_v1_cards__card_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CardUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CardOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_card_api_v1_cards__card_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                card_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Forbidden */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    get_month_income_api_v1_months__month__income_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthIncomeOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    put_month_income_api_v1_months__month__income_put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                month: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["MonthIncomeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MonthIncomeOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_extra_incomes_api_v1_extra_incomes_get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraIncomeOut"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_extra_income_api_v1_extra_incomes_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtraIncomeCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraIncomeOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_extra_income_api_v1_extra_incomes__row_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExtraIncomeUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExtraIncomeOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_extra_income_api_v1_extra_incomes__row_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_recurring_expenses_api_v1_recurring_expenses_get: {
+        parameters: {
+            query?: {
+                month?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringExpenseOut"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_recurring_expense_api_v1_recurring_expenses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurringExpenseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringExpenseOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_recurring_expense_api_v1_recurring_expenses__row_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["RecurringExpenseUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecurringExpenseOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_recurring_expense_api_v1_recurring_expenses__row_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                row_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    list_expenses_api_v1_expenses_get: {
+        parameters: {
+            query?: {
+                start_date?: string | null;
+                end_date?: string | null;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseOut"][];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    create_expense_api_v1_expenses_post: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseCreate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    update_expense_api_v1_expenses__expense_id__put: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                expense_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ExpenseUpdate"];
+            };
+        };
+        responses: {
+            /** @description Successful Response */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ExpenseOut"];
+                };
+            };
+            /** @description Bad Request */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    delete_expense_api_v1_expenses__expense_id__delete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                expense_id: number;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Successful Response */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not Found */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description Conflict */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
         };

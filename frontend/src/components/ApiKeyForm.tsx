@@ -52,7 +52,7 @@ export function ApiKeyForm({ onChange, reason }: Props) {
       <p className="mt-1 text-muted-foreground" data-testid="api-key-source">
         {SOURCE_LABEL[source]}
       </p>
-      <form className="mt-3 flex flex-col gap-2" onSubmit={submit}>
+      <form className="mt-3 flex flex-col gap-2" onSubmit={submit} aria-label="API 金鑰">
         <label className="flex flex-col gap-1">
           <span>金鑰（與 Railway 的 API_KEY 相同）</span>
           <input

@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { ApiError, ApiKeyMissingError } from "./client";
-import { CARD_IN_USE_MESSAGE, MONTH_SETTLED_MESSAGE, NETWORK_ERROR_MESSAGE, describeApiError } from "./errors";
+import { CARD_IN_USE_MESSAGE, MONTH_SETTLED_MESSAGE, NETWORK_ERROR_MESSAGE, describeApiError, splitFieldErrors } from "./errors";
 
 describe("describeApiError", () => {
   it("統一格式：code、message、fields 原樣帶出（fields 給欄位下方顯示）", () => {
@@ -47,5 +47,27 @@ describe("describeApiError", () => {
   it("401 與缺金鑰不是統一格式，仍給可顯示的訊息", () => {
     expect(describeApiError(new ApiError(401, { detail: "unauthorized" }))).toMatchObject({ status: 401, code: null });
     expect(describeApiError(new ApiKeyMissingError()).message).toMatch(/金鑰/);
+  });
+});
+
+describe("splitFieldErrors", () => {
+  const validation = (fields: Record<string, string>) => describeApiError(new ApiError(400, { error: { code: "VALIDATION_ERROR", message: "資料格式有誤", fields } }));
+
+  it("全部欄位都有輸入框 → 放欄位下方，沒有整體訊息", () => {
+    expect(splitFieldErrors(validation({ name: "請輸入卡片名稱" }), ["name", "bank"])).toEqual({ fieldErrors: { name: "請輸入卡片名稱" }, formError: null });
+  });
+
+  it("沒有對應輸入框的欄位 → 併進整體訊息，列出欄位名與訊息；有輸入框的照舊放欄位下方", () => {
+    expect(splitFieldErrors(validation({ is_active: "不允許的欄位", name: "請輸入卡片名稱" }), ["name"])).toEqual({
+      fieldErrors: { name: "請輸入卡片名稱" },
+      formError: "資料格式有誤（is_active：不允許的欄位）",
+    });
+    expect(splitFieldErrors(validation({ a: "x", b: "y" }), []).formError).toBe("資料格式有誤（a：x；b：y）");
+  });
+
+  it("非 VALIDATION_ERROR 一律顯示整體訊息（欄位文案若有仍放欄位下方）", () => {
+    const inactive = describeApiError(new ApiError(400, { error: { code: "INACTIVE_REFERENCE", message: "所選的分類或信用卡已停用", fields: { category_id: "請選擇分類" } } }));
+    expect(splitFieldErrors(inactive, ["category_id"])).toEqual({ fieldErrors: { category_id: "請選擇分類" }, formError: "所選的分類或信用卡已停用" });
+    expect(splitFieldErrors(describeApiError(new TypeError("Failed to fetch")), ["name"])).toEqual({ fieldErrors: {}, formError: NETWORK_ERROR_MESSAGE });
   });
 });

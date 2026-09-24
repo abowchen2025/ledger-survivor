@@ -7,8 +7,8 @@ import { useState } from "react";
 
 import type { Card } from "@/api/cards";
 import { describeApiError } from "@/api/errors";
-import type { Expense } from "@/api/expenses";
-import { QuickEntryForm, type QuickEntryPayload } from "@/components/expenses/QuickEntryForm";
+import type { Expense, ExpenseUpdate } from "@/api/expenses";
+import { QuickEntryForm } from "@/components/expenses/QuickEntryForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDayLabel } from "@/lib/dates";
@@ -22,7 +22,7 @@ export interface WeekExpenseListProps {
   expenses: Expense[];
   categories: CategoryOption[];
   cards: Card[];
-  onUpdate: (id: number, payload: QuickEntryPayload) => Promise<void>;
+  onUpdate: (id: number, payload: ExpenseUpdate) => Promise<void>;
   onDelete: (id: number) => Promise<void>;
   onInactiveReference?: () => void;
   /** 測試注入；預設 window.confirm */

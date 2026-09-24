@@ -4,13 +4,14 @@
  */
 import { useEffect, useState } from "react";
 
-import { type Card, toCardUpdate } from "@/api/cards";
+import type { Card, CardCreate, CardUpdate } from "@/api/cards";
 import { useAuthFailureRedirect } from "@/api/auth-guard";
 import { describeApiError, ERROR_CODES } from "@/api/errors";
-import { CardForm, type CardFormPayload } from "@/components/cards/CardForm";
+import { CardForm } from "@/components/cards/CardForm";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { describeDueMonthOffset } from "@/lib/card-due-offset";
+import { cardUpdateFromCard } from "@/lib/card-payload";
 import { formatAmount } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { useCardStore } from "@/store/card-store";
@@ -41,13 +42,14 @@ export function CardManager() {
     }
   };
 
-  const onCreate = async (payload: CardFormPayload) => {
+  // payload 由 CardForm 經 lib/card-payload.ts 逐欄位組好：新增是 CardCreate（沒有 is_active），編輯是 CardUpdate
+  const onCreate = async (payload: CardCreate) => {
     await guard(() => create(payload));
     setAdding(false);
   };
 
-  const onEdit = async (card: Card, payload: CardFormPayload) => {
-    await guard(() => update(card.id, { ...payload, is_active: card.is_active }));
+  const onEdit = async (card: Card, payload: CardUpdate) => {
+    await guard(() => update(card.id, payload));
     setEditingId(null);
   };
 
@@ -55,7 +57,7 @@ export function CardManager() {
     setBusyId(card.id);
     setRowNotice(null);
     try {
-      await guard(() => update(card.id, toCardUpdate(card, { is_active: !card.is_active })));
+      await guard(() => update(card.id, cardUpdateFromCard(card, { is_active: !card.is_active })));
     } catch (err) {
       setRowNotice({ id: card.id, message: describeApiError(err).message, offerDeactivate: false });
     } finally {

@@ -49,24 +49,36 @@ def goto_month(page: Page, year: int, month: int, clicks_so_far: int = 0) -> int
         clicks += 1
 
 
-def _assert_cross_month_week_shown(page: Page) -> None:
+def _straddle_label(page: Page, month: int):
+    """「這週算 M 月」小標籤（容許空白差異）。"""
+    return page.get_by_text(re.compile(rf"這週算\s*{month}\s*月"))
+
+
+def _assert_cross_month_week_shown(page: Page, expected_labels: dict[int, int]) -> None:
+    """9/28～10/4 那一列在格線上，且各「這週算 M 月」標籤的數量恰好等於 expected_labels[M]。
+
+    數量由週歸屬規則決定（週四所在月份；services/week_rule.py），不是「至少一個」：
+    10 月的月曆有兩列跨月週（9/28～10/4、10/26～11/1）都算 10 月，若只斷言「有標籤」，
+    10/26 那一列會替 9/28 那一列通過，漏掉「9/28 列沒標籤」這種缺陷。
+    標籤與日期格分屬不同的 <tr>，不依賴 DOM 結構把兩者綁在一起，改用精確數量把每一列都算進來。
+    """
     # 該週的頭尾兩天都在格線上（每一格是按鈕，aria-label 以「M/D（週）」開頭；lib/dates.ts::formatDayLabel）
     # 斜線要跳脫：Playwright 把 re 轉成 JS 的 /.../ 字面值，沒跳脫的 / 會提早結束 regex
     expect(page.get_by_role("button", name=re.compile(r"^9\/28（一）"))).to_be_visible()
     expect(page.get_by_role("button", name=re.compile(r"^10\/4（日）"))).to_be_visible()
-    # 「這週算 10 月」小標籤（容許空白差異）。10 月份的月曆還有 10/26～11/1 那一列也算 10 月，所以可能不只一個。
-    label = page.get_by_text(re.compile(r"這週算\s*10\s*月"))
-    expect(label).not_to_have_count(0)
-    expect(label.first).to_be_visible()
+    for month, count in expected_labels.items():
+        expect(_straddle_label(page, month)).to_have_count(count)
 
 
 def test_cross_month_week_label(page: Page, e2e_env: E2EEnv) -> None:
     page.goto(e2e_env.page_url("/calendar"))
 
+    # 2026-09 月曆的列：8/31～9/6（週四 9/3 → 9 月）… 9/28～10/4（週四 10/1 → 10 月）
     clicks = goto_month(page, 2026, 9)
     expect(page.get_by_role("heading", name=_month_label(2026, 9))).to_be_visible()
-    _assert_cross_month_week_shown(page)
+    _assert_cross_month_week_shown(page, {10: 1, 9: 1})
 
+    # 2026-10 月曆的列：9/28～10/4（週四 10/1）… 10/26～11/1（週四 10/29），兩列都算 10 月
     goto_month(page, 2026, 10, clicks_so_far=clicks)
     expect(page.get_by_role("heading", name=_month_label(2026, 10))).to_be_visible()
-    _assert_cross_month_week_shown(page)
+    _assert_cross_month_week_shown(page, {10: 2})

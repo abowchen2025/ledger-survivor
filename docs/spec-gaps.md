@@ -13,19 +13,20 @@
 | 5 | REQ-AUTH-000 臨時 API 金鑰閘門 | 已回收至 SRS v1.6（v1.3 首次回收，v1.6 依 2026-09-23 改寫版重新回收） |
 | 6 | REQ-NFR-008 健康檢查三端點 | 已回收至 SRS v1.3（v1.6 沿用） |
 | 7 | REQ-NFR-009 CORS 來源白名單 | 已回收至 SRS v1.6 |
-| 8 | Phase 1 核心 API 決定（8.1～8.10） | 已回收至 SRS v1.6（8.1 → REQ-NFR-010，8.2 → 四章權限段落，8.3～8.10 → 各模組 API 表與 REQ 補述） |
+| 8 | Phase 1 核心 API 決定（8.1～8.10） | 部分回收至 SRS v1.6：8.1 有四則文案未進 SRS，見第 11 節 |
 | 9 | Phase 1 前端三個畫面的呈現決定（9.1～9.10）＋ 9.11 技術債 | **待回收** |
 | 10 | Phase 2 可支配金額：`salary` 為 `null` 的處理 | 已寫入 SRS v1.6.1（REQ-INCOME-006） |
+| 11 | SRS v1.6.1 已知待同步項（11.1～11.4） | **待回收**（下一個 docs PR） |
 
 
-### 1. 唯一約束（已回收，SRS v1.6）
+### 1. 唯一約束（已回收，SRS v1.3）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
 | `category_groups` 唯一約束 | `unique(user_id, code)`，約束名 `uq_category_groups_user_code` | 第三章 `category_groups` 加 `unique(user_id, code)` |
 | `categories` 唯一約束 | `unique(user_id, group_id, name)`，約束名 `uq_categories_user_group_name` | 第三章 `categories` 加 `unique(user_id, group_id, name)`；同組下二級分類名稱不可重複 |
 
-### 2. CHECK 格式限制（已回收，SRS v1.6）
+### 2. CHECK 格式限制（已回收，SRS v1.3）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
@@ -33,7 +34,7 @@
 | 所有 `month` 類欄位格式 | `VARCHAR(7)` + `CHECK (col ~ '^[0-9]{4}-(0[1-9]\|1[0-2])$')`，套用於 `monthly_incomes.month`、`extra_incomes.month`、`recurring_expenses.start_month`／`end_month`（可 NULL）、`installments.first_month`、`reward_ledger.month` | 明確寫出 `YYYY-MM` 格式且月份限 01～12 |
 | `credit_cards.color` 格式 | `VARCHAR(7)` + `CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$')` | `color` 為 `#RRGGBB` 十六進位，可為 NULL |
 
-### 3. `necessity = excluded` 與基準總和排除規則（已回收，SRS v1.6）
+### 3. `necessity = excluded` 與基準總和排除規則（已回收，SRS v1.3）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
@@ -41,7 +42,7 @@
 | 基準總和檢查排除 REWARD | `benchmark_min_pct`／`max_pct` 對 REWARD 維持 NULL；REQ-CATEGORY-004 的 90～110% 總和檢查只計算 `counts_toward_target = true` 的分類 | REQ-CATEGORY-004 加註「只計 `counts_toward_target = true` 的分類，REWARD 不參與」；REWARD 的基準欄位允許 NULL |
 | 基準總和檢查的定義（規格漏洞，2026-09-21 ABow 決定） | 架構描述 6.5 與 REQ-CATEGORY-004 只寫「總和落在 90～110%」，未定義用 min、max 或中點。內建 6 類目前 min 合計 70%、max 合計 115%、中點合計 92.5%。決定改為兩層檢查，**Phase 3 才實作，本輪只記錄**：①硬性檢查（擋下）：`min 合計 ≤ 100 ≤ max 合計`，各類區間須能容納一組真實的 100% 分配，目前 70 ≤ 100 ≤ 115 通過；②軟性提示（只警告不擋）：中點合計落在 90～110%，目前 92.5% 通過。兩層都只計 `counts_toward_target = true` 的分類 | REQ-CATEGORY-004 改寫為上述兩層檢查，並註明硬性／軟性的差別（擋下 vs 提示）；架構描述 6.5 第 2 條同步修改 |
 
-### 4. 欄位型別決定（SRS 寫「—」者）（已回收，SRS v1.6）
+### 4. 欄位型別決定（SRS 寫「—」者）（已回收，SRS v1.3）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
@@ -85,7 +86,7 @@
 | **新增缺口：401 回應格式** | `401`，body 固定 `{"detail": "unauthorized"}`，`Content-Type: application/json`；不帶 `WWW-Authenticate`（沒有瀏覽器原生驗證流程要觸發） | 條文；日後 API 錯誤格式統一時一起定 |
 | **新增缺口：CORS 預檢不經閘門** | 瀏覽器預檢 `OPTIONS` 不帶 `X-API-Key`，由 `CORSMiddleware` 在路由前回應，不會被 401（`tests/api/test_cors.py::test_preflight_for_health_does_not_require_api_key`）。金鑰的傳遞方式（自訂標頭）與 CORS 的關係見第 7 節 | 條文加註 |
 
-### 6. 健康檢查端點（REQ-NFR-008，2026-09-21 ABow 決定；**已實作**於 Phase 0b 收尾，測試條件 2026-09-22 進 `docs/test_conditions_v1_1.yaml`）（已回收，SRS v1.6）
+### 6. 健康檢查端點（REQ-NFR-008，2026-09-21 ABow 決定；**已實作**於 Phase 0b 收尾，測試條件 2026-09-22 進 `docs/test_conditions_v1_1.yaml`）（已回收，SRS v1.3）
 
 **為什麼是規格缺口**：健康檢查現在是部署的守門員（Railway healthcheck 指向它，決定新版本是否切流量），是有行為、可測試的需求，不該只活在程式碼裡。SRS 目前沒有任何條文定義 health 端點。決策理由見 `docs/adr/0006`。
 
@@ -121,7 +122,7 @@
 | **新增缺口：前端建置期變數** | 只有 `VITE_API_BASE_URL`（只到 host[:port]，不含 `/api/v1`），Pages 由同名 GitHub Secret 注入，缺了 build 失敗。`VITE_DEV_API_KEY` 只是本機 dev 預設值，production build 忽略。`frontend/src/api/client.ts` 是後端呼叫唯一入口（帶 base URL 與 `X-API-Key`，非 2xx 丟 `ApiError`）。金鑰本身見第 5 節與 `docs/adr/0007` | 架構描述 6.x 或 SRS 第五章補「前端設定」；README 已列 |
 | **新增缺口：設定頁金鑰欄位與後端連線狀態** | `frontend/src/components/ApiKeyForm.tsx`：金鑰輸入、儲存到 `localStorage`、清除、顯示目前來源（已儲存／開發預設／尚未設定），從其他頁被導過來時顯示原因；`ApiStatus.tsx` 打 `GET /auth/me` 顯示連線結果（正常／尚未設定金鑰／401／連不上），存完金鑰立刻重查 | SRS 4.x 設定頁畫面補「API 金鑰」與「後端連線」兩個區塊（Phase 3 移除金鑰區塊） |
 
-### 8. Phase 1 核心 API 決定（2026-09-23 ABow 決定；**已實作**，分支 `phase-1-core-api`）（已回收，SRS v1.6）
+### 8. Phase 1 核心 API 決定（2026-09-23 ABow 決定；**已實作**，分支 `phase-1-core-api`）（部分回收，見第 11 節）
 
 **為什麼是規格缺口**：SRS 4.1、4.2、4.5、4.7 的 API 表只寫狀態碼與觸發條件，沒有定義錯誤回應的格式、使用者隔離的行為、額外收入的端點、月薪沿用的讀取方式、行動支付綁卡的判定、停用參照的處理、「所屬月份已結算」的判定基準、深夜記帳的時區。以下每一項都是實作前必須定的，由 ABow 決定後照做。
 
@@ -250,3 +251,16 @@
 | 何時出現 | 只在「從未設定過任何月份的月薪」時；有任何一個月的紀錄就依 REQ-INCOME-002 往前沿用 | 既有 `services/income.py::resolve_month_income` |
 
 小節 10 為 2026-09-24 新增，隨 SRS v1.6.1 一起寫入（PR `docs-srs-v1-6`），不需再回收。
+
+### 11. SRS v1.6.1 已知待同步項（2026-09-24 規劃者記錄；下一個 docs PR 處理）
+
+**為什麼是規格缺口**：PR #9（`docs-srs-v1-6`）把 v1.6 帶進 repo 時，只允許三處勘誤與治理文字；審查時發現以下四項 SRS 本身尚未同步的內容，記在這裡等下一個 docs PR 一次處理，不在 #9 動業務規則。
+
+| # | 項目 | 內容 | SRS 目標位置 |
+|---|---|---|---|
+| 11.1 | 8.1 未進 SRS 的四則文案 | `categories.sort_order`「排序須為整數」、查詢參數日期「日期格式須為 YYYY-MM-DD」、`DUPLICATE_NAME`「同一一級分類下已有相同名稱的分類」、無對應文案時的「格式有誤」 | 4.7 欄位規格表、4.5 API 表 GET 列、4.7 API 表 409、REQ-NFR-010 詳細規格 |
+| 11.2 | 追溯矩陣重算 | 改以 `test_conditions_v1_2.yaml`（103 條）重算；登記既有測試後缺口由 38 降為 36（新覆蓋 REQ-AUTH-001、REQ-NFR-010） | 附錄「需求追溯矩陣」、缺口 (b) 清單、第六章數字 |
+| 11.3 | 4.8 計分模組補交互參照 | 週上限為 `null` 的週不計分、不影響連勝（REQ-INCOME-006，v1.6.1 結案第 4 項時只寫在 4.1） | 4.8 業務規則加一句交互參照 |
+| 11.4 | 前後端 payload 契約沒有對應 REQ | `TC-FUNC-CONTRACT-001～003` 暫掛 REQ-NFR-010（「未知欄位 → 400」那一項）；新增 **REQ-NFR-011**（前後端資料形狀一致，依據 ADR-0008：前端實際產生的 payload 必須被後端 Pydantic Create／Update schema 接受）後改掛 | 五、5.2 NFR 表新增一列＋詳細規格；YAML 三條 `req` 改掛 |
+
+小節 11 為 2026-09-24 新增（PR #9 審查意見）。

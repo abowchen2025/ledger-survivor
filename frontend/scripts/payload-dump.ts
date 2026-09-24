@@ -14,10 +14,33 @@
  * 執行：npm run payload:dump（tsx scripts/payload-dump.ts）
  */
 import type { Card } from "../src/api/cards";
+import type { Category } from "../src/api/categories";
 import { type CardFormValues, DEFAULT_CARD_COLOR, cardCreatePayload, cardUpdateFromCard, cardUpdatePayload, parseCardForm } from "../src/lib/card-payload";
+import { categoryCreatePayload, categoryRenamePayload, categoryUpdateFromCategory, parseCategoryForm } from "../src/lib/category-payload";
 import { type ExpenseFormValues, expenseCreatePayload, expenseUpdatePayload, parseExpenseForm } from "../src/lib/expense-payload";
+import {
+  extraIncomeCreatePayload,
+  extraIncomeUpdatePayload,
+  monthIncomePayload,
+  parseExtraIncomeForm,
+  parseMonthIncomeForm,
+  parseRecurringExpenseForm,
+  recurringExpenseCreatePayload,
+  recurringExpenseUpdatePayload,
+} from "../src/lib/income-payload";
 
-type SchemaName = "CardCreate" | "CardUpdate" | "ExpenseCreate" | "ExpenseUpdate";
+type SchemaName =
+  | "CardCreate"
+  | "CardUpdate"
+  | "ExpenseCreate"
+  | "ExpenseUpdate"
+  | "MonthIncomeUpdate"
+  | "ExtraIncomeCreate"
+  | "ExtraIncomeUpdate"
+  | "RecurringExpenseCreate"
+  | "RecurringExpenseUpdate"
+  | "CategoryCreate"
+  | "CategoryUpdate";
 
 export type Scenario =
   | "card_create"
@@ -29,7 +52,15 @@ export type Scenario =
   | "expense_create_mobile_pay"
   | "expense_create_transfer"
   | "expense_create_refund"
-  | "expense_edit";
+  | "expense_edit"
+  | "month_income_put"
+  | "extra_income_create"
+  | "extra_income_edit"
+  | "recurring_expense_create"
+  | "recurring_expense_edit"
+  | "category_create"
+  | "category_rename"
+  | "category_deactivate";
 
 interface DumpCase {
   id: string;
@@ -219,5 +250,77 @@ cases.push({
   description: "編輯：退款、改成現金（卡片欄位隱藏 → card_id null）",
   payload: expenseUpdatePayload(expenseFields({ ...emptyExpenseForm, date: "2026-09-18", amountInput: "80", refund: true, item: "退咖啡", categoryId: 1, paymentMethod: "cash", cardId: 1 })),
 });
+
+// ---------- 收入設定（SRS 4.1；phase-1-settings-calendar） ----------
+
+function ok<T>(parsed: { ok: true; fields: T } | { ok: false; errors: Record<string, string> }, what: string): T {
+  if (!parsed.ok) throw new Error(`${what} rejected by frontend validation: ${JSON.stringify(parsed.errors)}`);
+  return parsed.fields;
+}
+
+cases.push({
+  id: "month_income_put_basic",
+  schema: "MonthIncomeUpdate",
+  scenario: "month_income_put",
+  description: "月薪含千分位與小數、儲蓄目標空白（視為 0）",
+  payload: monthIncomePayload(ok(parseMonthIncomeForm({ salary: "52,000.5", savingsTarget: "" }), "month income")),
+});
+cases.push({
+  id: "month_income_put_zero_salary",
+  schema: "MonthIncomeUpdate",
+  scenario: "month_income_put",
+  description: "月薪 0（≥0 合法）、儲蓄目標 5000",
+  payload: monthIncomePayload(ok(parseMonthIncomeForm({ salary: "0", savingsTarget: "5000" }), "month income")),
+});
+cases.push({
+  id: "extra_income_create",
+  schema: "ExtraIncomeCreate",
+  scenario: "extra_income_create",
+  description: "額外收入新增：月份來自設定頁選的月份",
+  payload: extraIncomeCreatePayload(ok(parseExtraIncomeForm({ name: " 年終獎金 ", amount: "30,000" }, "2026-12"), "extra income")),
+});
+cases.push({
+  id: "extra_income_edit",
+  schema: "ExtraIncomeUpdate",
+  scenario: "extra_income_edit",
+  description: "額外收入編輯：整筆取代，金額含小數",
+  payload: extraIncomeUpdatePayload(ok(parseExtraIncomeForm({ name: "接案", amount: "1234.5" }, "2026-09"), "extra income")),
+});
+cases.push({
+  id: "recurring_expense_create_open_ended",
+  schema: "RecurringExpenseCreate",
+  scenario: "recurring_expense_create",
+  description: "固定支出新增：沒有結束月（null）",
+  payload: recurringExpenseCreatePayload(ok(parseRecurringExpenseForm({ name: "房租", amount: "18000", startMonth: "2026-01", endMonth: "" }), "recurring")),
+});
+cases.push({
+  id: "recurring_expense_create_with_end",
+  schema: "RecurringExpenseCreate",
+  scenario: "recurring_expense_create",
+  description: "固定支出新增：起訖月相同（結束月＝起始月合法）",
+  payload: recurringExpenseCreatePayload(ok(parseRecurringExpenseForm({ name: "一次性保費", amount: "2,000", startMonth: "2026-09", endMonth: "2026-09" }), "recurring")),
+});
+cases.push({
+  id: "recurring_expense_edit",
+  schema: "RecurringExpenseUpdate",
+  scenario: "recurring_expense_edit",
+  description: "固定支出編輯：加上結束月",
+  payload: recurringExpenseUpdatePayload(ok(parseRecurringExpenseForm({ name: "健身房", amount: "1500", startMonth: "2026-11", endMonth: "2027-10" }), "recurring")),
+});
+
+// ---------- 二級分類（SRS 4.7；phase-1-settings-calendar） ----------
+
+const existingCategory: Category = { id: 12, group_id: 1, name: "手搖飲", is_system: false, sort_order: 2, is_active: true };
+
+function categoryName(raw: string): string {
+  const parsed = parseCategoryForm({ name: raw });
+  if (!parsed.ok) throw new Error(`category name rejected by frontend validation: ${JSON.stringify(parsed.errors)}`);
+  return parsed.name;
+}
+
+cases.push({ id: "category_create", schema: "CategoryCreate", scenario: "category_create", description: "新增二級分類到目前展開的一級分類；不送 sort_order", payload: categoryCreatePayload(categoryName(" 早餐 "), 1) });
+cases.push({ id: "category_rename", schema: "CategoryUpdate", scenario: "category_rename", description: "改名：整筆 PUT，group_id／sort_order／is_active 沿用", payload: categoryRenamePayload(existingCategory, categoryName("飲料")) });
+cases.push({ id: "category_deactivate", schema: "CategoryUpdate", scenario: "category_deactivate", description: "停用：只翻 is_active", payload: categoryUpdateFromCategory(existingCategory, { is_active: false }) });
+cases.push({ id: "category_reactivate", schema: "CategoryUpdate", scenario: "category_deactivate", description: "重新啟用：從已停用的分類組出", payload: categoryUpdateFromCategory({ ...existingCategory, is_active: false }, { is_active: true }) });
 
 process.stdout.write(JSON.stringify({ generated_by: "frontend/scripts/payload-dump.ts", cases }) + "\n");

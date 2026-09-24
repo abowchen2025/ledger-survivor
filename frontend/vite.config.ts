@@ -59,5 +59,8 @@ export default defineConfig({
     globals: true,
     include: ["src/**/*.test.ts", "src/**/*.test.tsx"],
     setupFiles: ["src/test/setup.ts"],
+    // 元件測試用 user-event 逐鍵輸入，17 個檔案並行時單一測試在這台 Windows 機器上會超過預設 5 秒；
+    // 逾時的測試殘留的鍵盤事件會漏進下一個測試（曾看到 "0主卡"）。放寬到 20 秒，只影響上限不影響斷言。
+    testTimeout: 20_000,
   },
 });

@@ -3,7 +3,7 @@
 **日期**：2026-09-22
 **依據**：《記帳生存遊戲系統架構描述 v2.2》＋ Step 1 問題清單確認結果（Q1～Q21）＋ sa-core v1.9 規格書結構標準＋《測試條件 v1.0》追溯鏈修正＋ Phase 0 開發回收（repo `docs/spec-gaps.md`，40 項，2026-09-20／09-21 ABow 決定）
 **性質**：spec-first 起家，Phase 0 已完成開發；本文件依 sa-core 5 節標準，SRS 與 FS 合一，不另出分冊
-**取代**：本文件取代《記帳生存遊戲 SRS+FS v1.5》——v1.6 回收 repo `docs/spec-gaps.md`（2026-09-23 版）第5～8節，處理 v1.3 回收時漏掉的後續演進：REQ-AUTH-000 改寫（前端金鑰改為使用者輸入存 localStorage，原「建置期環境變數／GitHub Secrets」作廢）、新增 REQ-NFR-009（CORS）與 REQ-NFR-010（統一錯誤格式）、REQ-EXPENSE-005／REQ-SETTLE-003／REQ-INCOME-002 等多條既有 REQ 補上實作細節、四章開頭權限段落 403→404、需求追溯矩陣改以 repo 的 `test_conditions_v1_1.yaml`（78條）為準重算。**本文件為此規劃對話的最後一版**，定稿後 SRS 隨 repo 交接給開發端的規劃者維護
+**取代**：本文件（v1.6.1）取代 v1.6，差異見第八章版本記錄。v1.6：本文件取代《記帳生存遊戲 SRS+FS v1.5》——v1.6 回收 repo `docs/spec-gaps.md`（2026-09-23 版）第5～8節，處理 v1.3 回收時漏掉的後續演進：REQ-AUTH-000 改寫（前端金鑰改為使用者輸入存 localStorage，原「建置期環境變數／GitHub Secrets」作廢）、新增 REQ-NFR-009（CORS）與 REQ-NFR-010（統一錯誤格式）、REQ-EXPENSE-005／REQ-SETTLE-003／REQ-INCOME-002 等多條既有 REQ 補上實作細節、四章開頭權限段落 403→404、需求追溯矩陣改以 repo 的 `test_conditions_v1_1.yaml`（78條）為準重算。**本文件為此規劃對話的最後一版**，定稿後 SRS 隨 repo 交接給開發端的規劃者維護
 
 ---
 
@@ -909,9 +909,9 @@ Railway ── FastAPI ──► PostgreSQL
 
 ## 六、待確認事項清單（Open Issues）
 
-Step 1 的 21 題已全數確認並反映於本文件各模組章節。附錄「回收矛盾清單」累計 4 項，3 項已結案，v1.6 新增 1 項待確認（月薪為 null 時可支配金額公式如何處理，Phase 2 動工前須決定）。另見附錄「需求追溯矩陣」的缺口清單，38 個 REQ 目前無 TC 覆蓋，是否補測由 ABow 或開發端規劃者決定。
+Step 1 的 21 題已全數確認並反映於本文件各模組章節。附錄「回收矛盾清單」累計 4 項，已全數結案（第 4 項於 v1.6.1 結案，見 REQ-INCOME-006）。附錄「需求追溯矩陣」仍以 `test_conditions_v1_1.yaml`（78 條）計算，列出 38 個無 TC 覆蓋的 REQ；`test_conditions_v1_2.yaml` 登記既有測試後實際為 36 個，矩陣於下一個 docs PR 同步（見 `docs/spec-gaps.md` 第 11 節）。
 
-**本文件為此規劃對話的最後一版。** 定稿後 SRS 隨 repo 交接，後續規格維護由開發端的規劃者依 repo 的 `docs/spec-gaps.md` 統一處理，這個對話不再產出新版 SRS。
+v1.6 為原規格對話的最後一版。自 v1.6.1 起，SRS 由開發端規劃者依 `docs/spec-gaps.md` 在 docs PR 中維護。
 
 ---
 
@@ -1102,4 +1102,4 @@ repo YAML與三份補充YAML合計引用的56個REQ，全數在本文件找到**
 | v1.4 | 2026-09-22 | 處理 v1.3 回收矛盾清單 2 項：1.5 Phase 1 驗收改為有條件寫法並將 REQ-AUTH-000 定為兩週真實記帳期的前置門檻；REQ-CATEGORY-002 加交互參照。依 ABow 決定新增 REQ-CATEGORY-010（`excluded` 不開放給一般分類），同步更新 4.7 欄位規格表、API 例外、驗收條件、第三章 necessity 欄位備註；新增《測試條件 v1.4 補充》2 條；追溯矩陣更新至 91 個 REQ；矛盾清單新增 1 項待確認（獎勵類 necessity 鎖定）。其餘既有業務規則內容不動；取代原 v1.3 |
 | v1.5 | 2026-09-22 | 結案回收矛盾清單第3項：新增 REQ-CATEGORY-011，獎勵一級分類 `necessity` 鎖定為 `excluded`、不可修改為其他值，與 REQ-CATEGORY-010 形成雙向鎖定；同步更新 4.7 業務規則、API 例外、驗收條件、REQ-CATEGORY-002 交互參照、第三章 necessity 欄位備註；新增《測試條件 v1.5 補充》1 條；追溯矩陣更新至 92 個 REQ；回收矛盾清單 3 項全數結案，無待確認項。其餘既有業務規則內容不動；取代原 v1.4 |
 | v1.6 | 2026-09-24 | 回收 `docs/spec-gaps.md`（2026-09-23版）第5～8節。**修正**：REQ-AUTH-000 前端金鑰機制改寫（使用者輸入存localStorage，原建置期環境變數／GitHub Secrets作廢），補`/auth/me`端點、401格式、CORS預檢說明；四章開頭「否則回403」改「回404」（8.2，ABow明確指示）。**回收**：新增REQ-NFR-009（CORS）、REQ-NFR-010（統一錯誤格式）；REQ-INCOME-002、REQ-EXPENSE-005、REQ-SETTLE-003、REQ-CARD-002、REQ-WEEK-005補實作細節；4.1/4.2/4.5/4.7 API表與欄位規格表補齊8.3～8.10各項。**矩陣**：改以repo`test_conditions_v1_1.yaml`（78條）＋既有三份補充YAML為準重算，86條TC覆蓋56個REQ，94個REQ總數，38個缺口。**順帶修正**v1.5內部不一致：4.7狀態呈現／操作流程與REQ-CATEGORY-004的兩層檢查對齊。回收矛盾清單新增1項待確認（月薪null時可支配金額公式）。除第一類「修正」外，其餘既有業務規則內容不動；取代原v1.5。**本版為此規劃對話最後一版**，後續由開發端規劃者依repo的`docs/spec-gaps.md`維護 |
-| v1.6.1 | 2026-09-24 | 開發端首次維護（repo PR，分支 `docs-srs-v1-6`）。勘誤 REQ-SETTLE-003（v1.6 宣稱已收斂但原文未改，改為「刪除該月 `reward_ledger` 紀錄」）；結案回收矛盾清單第 4 項（月薪 `null` 時可支配與週上限為 `null`、不計分，寫入 REQ-INCOME-006）；治理欄位待確認項同步為 0。業務規則除上述兩處外不動；取代原 v1.6 |
+| v1.6.1 | 2026-09-24 | 開發端首次維護（repo PR，分支 `docs-srs-v1-6`）。勘誤 REQ-SETTLE-003（v1.6 宣稱已收斂但原文未改，改為「刪除該月 `reward_ledger` 紀錄」）；結案回收矛盾清單第 4 項（月薪 `null` 時可支配與週上限為 `null`、不計分，寫入 REQ-INCOME-006）；治理欄位待確認項同步為 0；同步第六章與開頭「取代」段的治理文字。業務規則除上述兩處外不動；取代原 v1.6 |

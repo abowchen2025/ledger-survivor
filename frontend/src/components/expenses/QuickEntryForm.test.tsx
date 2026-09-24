@@ -9,9 +9,10 @@ import { describe, expect, it, vi } from "vitest";
 
 import type { Card } from "@/api/cards";
 import { ApiError } from "@/api/client";
+import type { ExpenseCreate, ExpenseUpdate } from "@/api/expenses";
 import type { CategoryOption } from "@/store/category-store";
 
-import { QuickEntryForm, type QuickEntryFormProps, type QuickEntryPayload } from "./QuickEntryForm";
+import { QuickEntryForm, type QuickEntryFormProps } from "./QuickEntryForm";
 
 const categories: CategoryOption[] = [
   { id: 1, name: "三餐外食", groupId: 1, groupName: "食", isReward: false, isActive: true },
@@ -30,18 +31,18 @@ const cards: Card[] = [
   },
 ];
 
-function setup(overrides: Partial<QuickEntryFormProps> = {}) {
-  const onSubmit = vi.fn<(p: QuickEntryPayload) => Promise<void>>().mockResolvedValue(undefined);
-  const utils = render(
-    <QuickEntryForm
-      mode="create"
-      initial={{ date: "2026-09-23", categoryId: 1, paymentMethod: "cash" }}
-      categories={categories}
-      cards={cards.filter((c) => c.is_active)}
-      onSubmit={onSubmit}
-      {...overrides}
-    />,
-  );
+type SetupOverrides = Partial<Omit<QuickEntryFormProps, "mode" | "onSubmit">> & { mode?: QuickEntryFormProps["mode"] };
+
+function setup({ mode = "create", ...overrides }: SetupOverrides = {}) {
+  // 同一個 mock 接兩種 payload 型別：create 收 ExpenseCreate、edit 收 ExpenseUpdate
+  const onSubmit = vi.fn<(p: ExpenseCreate | ExpenseUpdate) => Promise<void>>().mockResolvedValue(undefined);
+  const common = {
+    initial: { date: "2026-09-23", categoryId: 1, paymentMethod: "cash" as const },
+    categories,
+    cards: cards.filter((c) => c.is_active),
+    ...overrides,
+  };
+  const utils = render(mode === "create" ? <QuickEntryForm mode="create" onSubmit={onSubmit} {...common} /> : <QuickEntryForm mode="edit" onSubmit={onSubmit} {...common} />);
   const user = userEvent.setup();
   const amount = () => screen.getByLabelText("金額");
   const item = () => screen.getByLabelText("品項");
@@ -203,6 +204,19 @@ describe("QuickEntryForm 支付方式與信用卡欄位", () => {
     expect(onSubmit.mock.calls[1][0]).toMatchObject({ payment_method: "mobile_pay", card_id: 10 });
   });
 
+  it("編輯模式送出：payload 欄位集合就是 ExpenseUpdate（date 必有）", async () => {
+    const { user, submit, onSubmit } = setup({
+      mode: "edit",
+      cards,
+      initial: { date: "2026-09-01", amountInput: "100", item: "舊帳", categoryId: 1, paymentMethod: "credit_card", cardId: 11, note: "備註" },
+    });
+    await user.click(submit());
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const payload = onSubmit.mock.calls[0][0];
+    expect(Object.keys(payload).sort()).toEqual(["amount", "card_id", "category_id", "date", "item", "note", "payment_method"]);
+    expect(payload).toEqual({ date: "2026-09-01", amount: 100, item: "舊帳", category_id: 1, payment_method: "credit_card", card_id: 11, note: "備註" });
+  });
+
   it("編輯模式保留原本已停用的卡片供沿用", () => {
     setup({
       mode: "edit",
@@ -249,6 +263,31 @@ describe("QuickEntryForm 錯誤處理", () => {
     await waitFor(() => expect(screen.getByTestId("form-error")).toHaveTextContent("所選的分類或信用卡已停用"));
     expect(screen.getByText("請選擇分類")).toBeInTheDocument();
     expect(onInactiveReference).toHaveBeenCalledTimes(1);
+  });
+
+  it("error.fields 沒有對應輸入框的欄位 → 表單頂部顯示整體錯誤（含欄位名與訊息），按鈕放開，不靜默吞掉", async () => {
+    const { user, amount, item, submit, onSubmit } = setup();
+    onSubmit.mockRejectedValueOnce(apiError(400, "VALIDATION_ERROR", { is_active: "不允許的欄位", item: "請輸入品項" }));
+    await user.type(amount(), "120");
+    await user.type(item(), "午餐");
+    await user.click(submit());
+    await waitFor(() => expect(screen.getByTestId("form-error")).toHaveTextContent("資料格式有誤（is_active：不允許的欄位）"));
+    // 有輸入框的照舊放欄位下方
+    expect(screen.getByText("請輸入品項")).toBeInTheDocument();
+    expect(submit()).not.toBeDisabled();
+    expect(submit()).toHaveTextContent("記一筆");
+    expect(amount()).toHaveValue("120");
+  });
+
+  it("送出被後端拒絕後，送出狀態在 finally 重設：按鈕不會卡在「送出中…」", async () => {
+    const { user, amount, item, submit, onSubmit } = setup();
+    onSubmit.mockRejectedValueOnce(apiError(400, "VALIDATION_ERROR", { note: "備註最多100字" }));
+    await user.type(amount(), "120");
+    await user.type(item(), "午餐");
+    await user.click(submit());
+    await waitFor(() => expect(submit()).not.toBeDisabled());
+    // 備註欄原本收合：收到 note 錯誤時展開讓文案看得到
+    expect(screen.getByText("備註最多100字")).toBeInTheDocument();
   });
 
   it("網路失敗 → 「連線失敗，請稍後再試」，表單內容保留", async () => {

@@ -1,6 +1,7 @@
 # CI：每個 PR 跑後端 pytest（含 PostgreSQL service container）、前端 vitest + build、
-# 前後端 week_rule 一致性測試（TC-SEC-WEEK-004）。P0 測試失敗擋合併（在 GitHub 分支保護規則
-# 把三個 job 設為 required check）。
+# 前後端 week_rule 一致性測試（TC-SEC-WEEK-004）與前端 payload 契約測試（tests/integration/）。
+# P0 測試失敗擋合併（在 GitHub 分支保護規則把三個 job 設為 required check；job 的 name 是 required check
+# 的名稱，改了名會讓保護規則等不到結果，所以 consistency job 名稱維持不變）。
 name: CI
 
 on:
@@ -128,6 +129,8 @@ jobs:
         run: uv sync --frozen
         working-directory: backend
 
-      - name: pytest tests/integration (frontend dump vs backend outputs)
+      - name: pytest tests/integration (week_rule consistency + frontend payload contract)
+        # test_week_rule_consistency.py：npm run week:dump 與 Python week_rule 逐筆比對
+        # test_frontend_payload_contract.py：npm run payload:dump 產生的實際 payload 丟進 Pydantic Create／Update schema
         run: uv run pytest -q tests/integration
         working-directory: backend

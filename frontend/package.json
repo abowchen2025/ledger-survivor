@@ -14,7 +14,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "gen:api": "openapi-typescript http://127.0.0.1:8765/openapi.json -o src/api/schema.d.ts",
-    "week:dump": "tsx scripts/week-dump.ts"
+    "week:dump": "tsx scripts/week-dump.ts",
+    "payload:dump": "tsx scripts/payload-dump.ts"
   },
   "dependencies": {
     "@base-ui/react": "^1.8.0",

@@ -4,58 +4,50 @@
  * - 結帳日／繳款日一改就即時預覽 due_month_offset（lib/card-due-offset.ts，與後端同一份 fixture 驗證），
  *   使用者可切成手動覆寫；送出時以後端回傳值為準。
  * - 期初卡債（opening_*）只在新增時顯示，編輯既有卡片鎖定（後端 PUT 不收這些欄位）。
- * - 後端 error.fields 顯示在對應欄位下方，不清空已輸入內容。
+ * - payload 不在這裡拼：一律交給 lib/card-payload.ts 逐欄位依 CardCreate／CardUpdate 組裝
+ *   （新增不送 is_active；編輯沿用該卡目前的 is_active）。onSubmit 的型別依 mode 分開，拿不到另一邊的形狀。
+ * - 顏色：畫面顯示什麼就送什麼。新增預設顯示並送出 #FF8800；按「清除」後顯示「未設定」並送 null。
+ * - 錯誤處理：送出狀態一律在 finally 重設；後端 error.fields 有對應輸入框的顯示在欄位下方，
+ *   沒有對應輸入框的（例如送錯欄位）併進表單頂部的整體錯誤，含欄位名與訊息，不靜默吞掉。
  */
 import { type FormEvent, useId, useState } from "react";
 
 import type { Card, CardCreate, CardUpdate } from "@/api/cards";
-import { describeApiError, ERROR_CODES } from "@/api/errors";
+import { describeApiError, splitFieldErrors } from "@/api/errors";
 import { FieldError } from "@/components/FieldError";
 import { FieldSelect } from "@/components/FieldSelect";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { type DueMonthOffset, describeDueMonthOffset, inferDueMonthOffset, isValidDayOfMonth } from "@/lib/card-due-offset";
-import { parseAmountInput } from "@/lib/money";
+import { type CardFormValues, DEFAULT_CARD_COLOR, HEX_COLOR_RE, cardCreatePayload, cardUpdatePayload, parseCardForm } from "@/lib/card-payload";
 
-export type CardFormPayload = CardCreate & CardUpdate;
-
-export interface CardFormProps {
-  mode: "create" | "edit";
-  initial?: Card;
-  /** 成功要 resolve；失敗丟出原始錯誤 */
-  onSubmit: (payload: CardFormPayload) => Promise<void>;
+interface CardFormBaseProps {
   onCancel?: () => void;
 }
 
-interface Values {
-  name: string;
-  bank: string;
-  last4: string;
-  statementDay: string;
-  dueDay: string;
-  /** "auto" 依推算；"0"／"1" 手動覆寫 */
-  offsetMode: "auto" | "0" | "1";
-  color: string;
-  openingBilledUnpaid: string;
-  openingUnbilled: string;
-  openingAsOf: string;
-}
+/** onSubmit 依 mode 收不同型別：新增只會拿到 CardCreate，編輯只會拿到 CardUpdate。成功要 resolve；失敗丟出原始錯誤。 */
+export type CardFormProps = CardFormBaseProps &
+  ({ mode: "create"; initial?: undefined; onSubmit: (payload: CardCreate) => Promise<void> } | { mode: "edit"; initial: Card; onSubmit: (payload: CardUpdate) => Promise<void> });
 
-// SRS 4.2 欄位規格表「檢核失敗文案」
-const MSG = {
-  name: "請輸入卡片名稱",
-  bank: "請輸入發卡銀行",
-  last4: "請輸入卡號末四碼（4位數字）",
-  statement_day: "結帳日須介於1-31",
-  due_day: "繳款日須介於1-31",
-  color: "顏色格式錯誤",
-  opening: "金額不可為負數",
-} as const;
+// 畫面上有輸入框、能把後端 error.fields 顯示在欄位下方的欄位（其餘併進整體錯誤）
+const EDIT_FIELDS = ["name", "bank", "last4", "statement_day", "due_day", "due_month_offset", "color"] as const;
+const CREATE_FIELDS = [...EDIT_FIELDS, "opening_billed_unpaid", "opening_unbilled", "opening_as_of"] as const;
 
-function initialValues(card?: Card): Values {
+function initialValues(card?: Card): CardFormValues {
   if (!card) {
-    return { name: "", bank: "", last4: "", statementDay: "", dueDay: "", offsetMode: "auto", color: "", openingBilledUnpaid: "", openingUnbilled: "", openingAsOf: "" };
+    return {
+      name: "",
+      bank: "",
+      last4: "",
+      statementDay: "",
+      dueDay: "",
+      offsetMode: "auto",
+      color: DEFAULT_CARD_COLOR,
+      openingBilledUnpaid: "",
+      openingUnbilled: "",
+      openingAsOf: "",
+    };
   }
   const inferred = inferDueMonthOffset(card.statement_day, card.due_day);
   return {
@@ -73,17 +65,10 @@ function initialValues(card?: Card): Values {
   };
 }
 
-/** 期初金額：空白視為 0（SRS 預設 0），否則須為 ≥0 的金額 */
-function parseOpening(raw: string): { ok: true; value: number } | { ok: false } {
-  if (!raw.trim()) return { ok: true, value: 0 };
-  if (raw.trim() === "0") return { ok: true, value: 0 };
-  const parsed = parseAmountInput(raw);
-  return parsed.ok ? { ok: true, value: parsed.value } : { ok: false };
-}
-
-export function CardForm({ mode, initial, onSubmit, onCancel }: CardFormProps) {
+export function CardForm(props: CardFormProps) {
+  const { mode, initial, onCancel } = props;
   const uid = useId();
-  const [values, setValues] = useState<Values>(() => initialValues(initial));
+  const [values, setValues] = useState<CardFormValues>(() => initialValues(initial));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const [formError, setFormError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
@@ -93,8 +78,9 @@ export function CardForm({ mode, initial, onSubmit, onCancel }: CardFormProps) {
   const daysValid = isValidDayOfMonth(statementDay) && isValidDayOfMonth(dueDay);
   const inferred: DueMonthOffset | null = daysValid ? inferDueMonthOffset(statementDay, dueDay) : null;
   const effectiveOffset: DueMonthOffset | null = values.offsetMode === "auto" ? inferred : (Number(values.offsetMode) as DueMonthOffset);
+  const colorIsValid = HEX_COLOR_RE.test(values.color);
 
-  const set = <K extends keyof Values>(key: K, value: Values[K], errorKey?: string) => {
+  const set = <K extends keyof CardFormValues>(key: K, value: CardFormValues[K], errorKey?: string) => {
     setValues((v) => ({ ...v, [key]: value }));
     const k = errorKey ?? key;
     setFieldErrors((e) => {
@@ -105,58 +91,31 @@ export function CardForm({ mode, initial, onSubmit, onCancel }: CardFormProps) {
     });
   };
 
-  const validate = (): CardFormPayload | null => {
-    const errors: Record<string, string> = {};
-    const name = values.name.trim();
-    const bank = values.bank.trim();
-    if (!name || name.length > 20) errors.name = MSG.name;
-    if (!bank || bank.length > 20) errors.bank = MSG.bank;
-    if (!/^\d{4}$/.test(values.last4)) errors.last4 = MSG.last4;
-    if (!isValidDayOfMonth(statementDay)) errors.statement_day = MSG.statement_day;
-    if (!isValidDayOfMonth(dueDay)) errors.due_day = MSG.due_day;
-    const color = values.color.trim();
-    if (color && !/^#[0-9A-Fa-f]{6}$/.test(color)) errors.color = MSG.color;
-    const billed = parseOpening(values.openingBilledUnpaid);
-    const unbilled = parseOpening(values.openingUnbilled);
-    if (!billed.ok) errors.opening_billed_unpaid = MSG.opening;
-    if (!unbilled.ok) errors.opening_unbilled = MSG.opening;
-    setFieldErrors(errors);
-    if (Object.keys(errors).length > 0 || !billed.ok || !unbilled.ok) return null;
-
-    const base: CardUpdate = {
-      name,
-      bank,
-      last4: values.last4,
-      statement_day: statementDay,
-      due_day: dueDay,
-      // auto：不送，讓後端依 REQ-CARD-002 推算（PUT 時來源欄位有變會重算）；覆寫：送明確值
-      due_month_offset: values.offsetMode === "auto" ? null : (Number(values.offsetMode) as 0 | 1),
-      color: color || null,
-      is_active: initial?.is_active ?? true,
-    };
-    if (mode === "edit") return base as CardFormPayload;
-    return {
-      ...base,
-      opening_billed_unpaid: billed.value,
-      opening_unbilled: unbilled.value,
-      opening_as_of: values.openingAsOf || null,
-    };
-  };
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setFormError(null);
-    const payload = validate();
-    if (!payload) return;
+    const parsed = parseCardForm(values);
+    if (!parsed.ok) {
+      setFieldErrors(parsed.errors);
+      return;
+    }
+    setFieldErrors({});
     setSubmitting(true);
     try {
-      await onSubmit(payload);
+      if (props.mode === "create") {
+        await props.onSubmit(cardCreatePayload(parsed.fields));
+      } else {
+        await props.onSubmit(cardUpdatePayload(parsed.fields, props.initial.is_active));
+      }
     } catch (err) {
-      const info = describeApiError(err);
-      setFieldErrors(info.fields);
-      setFormError(Object.keys(info.fields).length === 0 || info.code !== ERROR_CODES.VALIDATION_ERROR ? info.message : null);
+      // 只有畫面上真的有輸入框的欄位才能放到欄位下方；due_month_offset 的選單在天數不合法時不會出現
+      const known = (mode === "create" ? CREATE_FIELDS : EDIT_FIELDS).filter((f) => f !== "due_month_offset" || inferred !== null);
+      const split = splitFieldErrors(describeApiError(err), known);
+      setFieldErrors(split.fieldErrors);
+      setFormError(split.formError);
     } finally {
+      // 成功、後端拒絕、網路錯誤都要把按鈕從「送出中」放開
       setSubmitting(false);
     }
   };
@@ -165,6 +124,12 @@ export function CardForm({ mode, initial, onSubmit, onCancel }: CardFormProps) {
 
   return (
     <form className="flex flex-col gap-3" onSubmit={submit} noValidate aria-busy={submitting} data-testid="card-form">
+      {formError && (
+        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" data-testid="form-error">
+          {formError}
+        </p>
+      )}
+
       <div className="grid grid-cols-2 gap-3">
         <div className="flex flex-col gap-1">
           <Label htmlFor={id("name")}>卡名</Label>
@@ -208,7 +173,7 @@ export function CardForm({ mode, initial, onSubmit, onCancel }: CardFormProps) {
             <Label htmlFor={id("offset")} className="text-muted-foreground">
               繳款月偏移
             </Label>
-            <FieldSelect id={id("offset")} className="h-9 text-sm" value={values.offsetMode} onChange={(e) => set("offsetMode", e.target.value as Values["offsetMode"], "due_month_offset")}>
+            <FieldSelect id={id("offset")} className="h-9 text-sm" value={values.offsetMode} onChange={(e) => set("offsetMode", e.target.value as CardFormValues["offsetMode"], "due_month_offset")}>
               <option value="auto">自動推算（{inferred === 1 ? "次月" : "同月"}）</option>
               <option value="0">手動：同月（偏移 0）</option>
               <option value="1">手動：次月（偏移 1）</option>
@@ -221,11 +186,22 @@ export function CardForm({ mode, initial, onSubmit, onCancel }: CardFormProps) {
       <div className="flex flex-col gap-1">
         <Label htmlFor={id("color")}>卡面顏色（選填，#RRGGBB）</Label>
         <div className="flex items-center gap-2">
-          <input type="color" aria-label="選色" className="size-11 shrink-0 rounded-md border" value={/^#[0-9A-Fa-f]{6}$/.test(values.color) ? values.color : "#888888"} onChange={(e) => set("color", e.target.value.toUpperCase())} />
-          <Input id={id("color")} placeholder="#FF8800" maxLength={7} className="h-11" value={values.color} onChange={(e) => set("color", e.target.value)} aria-invalid={Boolean(fieldErrors.color)} />
-          {values.color && (
+          {colorIsValid ? (
+            <input type="color" aria-label="選色" className="size-11 shrink-0 rounded-md border" value={values.color.toUpperCase()} onChange={(e) => set("color", e.target.value.toUpperCase())} />
+          ) : (
+            // 沒有合法顏色就不顯示任何色塊：畫面看到的與送出的（null）一致
+            <span className="flex size-11 shrink-0 items-center justify-center rounded-md border border-dashed text-[10px] text-muted-foreground" data-testid="color-unset">
+              未設定
+            </span>
+          )}
+          <Input id={id("color")} maxLength={7} className="h-11" value={values.color} onChange={(e) => set("color", e.target.value)} aria-invalid={Boolean(fieldErrors.color)} />
+          {values.color ? (
             <Button type="button" variant="ghost" size="sm" onClick={() => set("color", "")}>
               清除
+            </Button>
+          ) : (
+            <Button type="button" variant="ghost" size="sm" onClick={() => set("color", DEFAULT_CARD_COLOR)}>
+              預設色
             </Button>
           )}
         </div>
@@ -253,12 +229,6 @@ export function CardForm({ mode, initial, onSubmit, onCancel }: CardFormProps) {
             <FieldError message={fieldErrors.opening_as_of} />
           </div>
         </fieldset>
-      )}
-
-      {formError && (
-        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" data-testid="form-error">
-          {formError}
-        </p>
       )}
 
       <div className="flex gap-2">

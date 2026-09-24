@@ -21,18 +21,3 @@ export function updateCard(id: number, payload: CardUpdate): Promise<Card> {
 export function deleteCard(id: number): Promise<void> {
   return apiFetch<void>(resolvePath("/api/v1/cards/{card_id}", { card_id: id }), { method: "DELETE" });
 }
-
-/** PUT 是整筆取代：從既有卡片組出 CardUpdate（不含 opening_*，建立後鎖定）。 */
-export function toCardUpdate(card: Card, overrides: Partial<CardUpdate> = {}): CardUpdate {
-  return {
-    name: card.name,
-    bank: card.bank,
-    last4: card.last4,
-    statement_day: card.statement_day,
-    due_day: card.due_day,
-    due_month_offset: card.due_month_offset as 0 | 1,
-    color: card.color,
-    is_active: card.is_active,
-    ...overrides,
-  };
-}

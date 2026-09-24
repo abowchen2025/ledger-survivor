@@ -7,7 +7,8 @@ import { useEffect, useMemo, useState } from "react";
 
 import { useAuthFailureRedirect } from "@/api/auth-guard";
 import { describeApiError } from "@/api/errors";
-import { type QuickEntryPayload, QuickEntryForm } from "@/components/expenses/QuickEntryForm";
+import type { ExpenseCreate, ExpenseUpdate } from "@/api/expenses";
+import { QuickEntryForm } from "@/components/expenses/QuickEntryForm";
 import { WeekExpenseList } from "@/components/expenses/WeekExpenseList";
 import { PageTitle } from "@/components/layout/PageTitle";
 import { Badge } from "@/components/ui/badge";
@@ -74,8 +75,8 @@ export default function ThisWeekPage() {
     cardStore.load().catch(() => undefined);
   };
 
-  const onCreate = (payload: QuickEntryPayload) => guard(() => expenseStore.create(payload));
-  const onUpdate = (id: number, payload: QuickEntryPayload) => guard(() => expenseStore.update(id, payload));
+  const onCreate = (payload: ExpenseCreate) => guard(() => expenseStore.create(payload));
+  const onUpdate = (id: number, payload: ExpenseUpdate) => guard(() => expenseStore.update(id, payload));
   const onDelete = (id: number) => guard(() => expenseStore.remove(id));
 
   const ready = categoryStore.loaded && cardStore.loaded;

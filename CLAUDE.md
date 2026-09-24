@@ -23,6 +23,7 @@
 - 測試檔命名帶 TC 編號可追溯，例：`tests/unit/test_week_rule.py::test_week_belongs_to_month_thursday_boundary` 對應 `TC-EDGE-WEEK-001`
 - `backend/tests/fixtures/week_cases.json` 是週歸屬規則的唯一真相，前端 `frontend/src/lib/week.test.ts` 也讀這份（相對路徑 `../../../backend/tests/fixtures/week_cases.json`）
 - `tests/integration/test_week_rule_consistency.py`（TC-SEC-WEEK-004）用 subprocess 跑前端 `npm run week:dump`，比對兩端輸出而非各自對答案（`docs/adr/0005`）；標記 `integration`，需要 Node 22 與 `frontend/node_modules`，缺了會失敗不會 skip
+- `tests/integration/test_frontend_payload_contract.py` 用 subprocess 跑前端 `npm run payload:dump`（`frontend/scripts/payload-dump.ts`，只能呼叫 `lib/card-payload.ts`、`lib/expense-payload.ts` 這些表單真正用的組裝函式），把前端實際產生的 payload 逐筆丟進後端 Pydantic Create／Update schema 驗證（`docs/adr/0008`）。新增業務表單時：組裝函式進 `lib/`、dump 加 case、後端測試的 `SCHEMAS` 與 `REQUIRED_SCENARIOS` 登記
 - `tests/api/test_health.py` 的 `/health/ready` 正常路徑需要本機 DB 已 `alembic upgrade head`；DB 不可用會失敗不會 skip。健康檢查三端點規格見 `docs/spec-gaps.md` 第 6 節（REQ-NFR-008）、`docs/adr/0006`
 - 雲端部署設定（pre-deploy `alembic upgrade head`、Healthcheck Path `/api/v1/health/ready`、target port 8080）只存在 Railway UI，`railway.json` 對本服務無效且已刪除；清單見 `docs/deployment-setup.md` 開頭
 - CI（`.github/workflows/ci.yml`）每個 PR 跑 backend pytest（PostgreSQL service container）+ frontend vitest/build + 一致性測試；P0 測試失敗擋合併
@@ -45,11 +46,14 @@
 - 新增業務 router 一律 include 進 `routers/protected.py` 的 `router`（REQ-AUTH-000 金鑰閘門掛在那一層），不要在 `main.py` 直接 include；只有 `routers/health.py` 三個端點豁免
 - 前端不直接呼叫 `fetch`，一律經 `frontend/src/api/client.ts`（統一帶 base URL 與 `X-API-Key`）；金鑰由使用者在設定頁輸入、存 localStorage，**不得**做成建置期變數或 GitHub Secret 嵌進產物（`docs/adr/0007`）；頁面在 catch 用 `useAuthFailureRedirect` 導向設定頁
 - 前端**不得**引用整個 `import.meta.env`，也不用 zustand 的 `devtools` middleware（它內部讀 `import.meta.env`）：Vite 會把含所有 `VITE_*` 的物件字面值嵌進 dist，`VITE_DEV_API_KEY` 就會外洩，`deploy-frontend.yml` 的哨兵檢查會擋下部署。本機驗法：`VITE_DEV_API_KEY=canary npm run build` 後 `grep -r canary dist` 必須沒有結果
+- 前端表單的 API payload 一律在 `frontend/src/lib/*-payload.ts` 逐欄位依 `schema.d.ts` 的 Create／Update 型別組裝，元件不得展開表單狀態物件當 payload 送出（TypeScript 不檢查展開的多餘屬性；2026-09-24 新增卡片多送 `is_active` 被後端 400 就是這樣漏的）；表單 `onSubmit` 依 mode 分 Create／Update 型別，不用 `Create & Update` 交集。後端 `RequestModel` 的 `extra="forbid"` 不得放寬
+- 表單送出狀態一律在 `finally` 重設；後端 `error.fields` 裡沒有對應輸入框的欄位要經 `api/errors.ts::splitFieldErrors` 併進表單頂部整體錯誤（含欄位名與訊息），不得靜默吞掉
 - 分期不建 `expenses` 記錄；期初卡債不進分類分析
 - 不得為了 CI 綠燈 skip／xfail 測試而不寫原因
 - 修改測試預期值要另開 `test:` commit 並在 PR 說明列出改了什麼、為什麼
 - 「測過了」需要證據：貼測試執行輸出，口頭宣告不算
 - **不自行 merge PR**，等 ABow 說「授權你合併 #N」
+- **每次合併後必須檢查該次 push 觸發的所有 workflow**（`gh run list --commit <merge sha>`：CI、Deploy frontend、Deploy backend；後兩者只在對應路徑有變動時觸發，沒觸發要說明是路徑過濾而非失敗），三條的結果全部寫進回報；任何一條失敗都用 `gh run view <id> --log-failed` 查原因，列在「未完成 / 需要決定」，不得只報成功的那幾條（2026-09-23 Deploy backend #9 失敗未回報的教訓）
 
 ## 遇到以下情況停下來回報，不要自己決定
 
@@ -110,5 +114,9 @@ Phase 1：核心記帳（收入設定、信用卡主檔、花費 CRUD、首頁�
 Phase 1 第一輪（分支 `phase-1-auth-cors`，PR #3，2026-09-22～23）：REQ-AUTH-000 臨時 API 金鑰閘門（fail closed、router 層級、三個 health 豁免、`/auth/me` 保留）、金鑰由使用者輸入存 localStorage（`docs/adr/0007`）、OpenAPI 文件依 `DEBUG` 開關、CORS 來源白名單（REQ-NFR-009，暫定編號）、前端 `api/client.ts`、測試條件升 v1.1。規格缺口見 `docs/spec-gaps.md` 第 5、7 節。
 
 Phase 1 第二輪（分支 `phase-1-core-api`，2026-09-23）：四個模組的後端 API（分類 `/category-groups`、`/categories`；信用卡 `/cards`；收入 `/months/{m}/income`、`/extra-incomes`、`/recurring-expenses`；花費 `/expenses`）。這個 PR 定下業務 API 的寫法模式，後續模組照做：router 只收參數、呼叫 service、回 schema；業務規則與所有 DB 查詢在 `services/`，簽名一律 `(db, user_id, ...)`，`user_id` 來自 `deps.CurrentUserId`；錯誤由 service `raise` `errors.ApiError` 子類別（400／403／404／409 統一 `{"error": {code, message, fields}}`，422 改回 400，401 不變）；請求 schema 繼承 `schemas/common.py::RequestModel` 並以 `field_messages` 宣告 SRS 檢核失敗文案；存取他人資料回 404；花費所屬月份的結算判定依週歸屬規則（`services/settlement.py`）。API 測試用 `tests/conftest.py` 的 `db`／`client` fixture（交易內執行、結束 rollback，需要本機 DB 已 `alembic upgrade head`）。規格決定見 `docs/spec-gaps.md` 第 8 節。
+
+Phase 1 第三輪（分支 `phase-1-quick-entry`，PR #5，2026-09-23）：前端 API 模組、錯誤格式解讀、三個 store、首頁快速記帳表單與本週清單、設定頁信用卡管理（含 due_month_offset 即時預覽，前後端共用 `card_due_offset` fixture）。
+
+Phase 1 修正輪（分支 `fix-card-create-payload`，2026-09-24）：Pages 新增卡片 400 的修正——payload 改在 `lib/card-payload.ts`、`lib/expense-payload.ts` 逐欄位組裝、新增不送 `is_active`、顏色送出值與畫面一致、`finally` 重設送出狀態、無對應輸入框的欄位錯誤顯示在表單頂部；新增 `npm run payload:dump` 與後端契約測試 `tests/integration/test_frontend_payload_contract.py`（`docs/adr/0008`）。
 
 已完成：Phase 0a（後端骨架、12 張表、seed、`week_rule` 測試）、Phase 0b（前端骨架六頁、PWA、前後端 `week_rule` 一致性測試 TC-SEC-WEEK-004、CI 三條 workflow、Dockerfile、README；`railway.json` 已刪除，Railway 設定只在 UI）。路由方式 HashRouter 已採納（`docs/adr/0004`）；雲端 migration 走 Railway pre-deploy、健康檢查拆 live／ready（`docs/adr/0006`）。Pages 與 Railway 皆已上線，見 `docs/deployment-setup.md` 開頭「目前狀態」。

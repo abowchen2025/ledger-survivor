@@ -79,3 +79,32 @@ function overrideMessage(code: string, backendMessage: string): string {
       return backendMessage;
   }
 }
+
+export interface SplitFieldErrors {
+  /** 畫面上有輸入框的欄位 → 文案（放到欄位下方） */
+  fieldErrors: Record<string, string>;
+  /** 表單頂部的整體訊息；null 代表所有錯誤都已放到欄位下方 */
+  formError: string | null;
+}
+
+/**
+ * 把 error.fields 分成「畫面上有對應輸入框」與「沒有」兩組（2026-09-24 ABow 第 2.3 節）。
+ *
+ * - 有對應輸入框的照舊顯示在欄位下方。
+ * - 沒有對應輸入框的（例如前端送了後端 schema 沒有的欄位、或後端新增了前端還沒有的欄位）
+ *   併進表單頂部的整體訊息，逐一列出「欄位名：訊息」。不可以靜默吞掉：看不到錯誤的表單等於卡死。
+ * - 非 VALIDATION_ERROR（409、403、網路錯誤…）一律顯示整體訊息，欄位文案（若有）照樣放到欄位下方。
+ */
+export function splitFieldErrors(info: ApiErrorInfo, knownFields: Iterable<string>): SplitFieldErrors {
+  const known = new Set(knownFields);
+  const fieldErrors: Record<string, string> = {};
+  const unmapped: string[] = [];
+  for (const [field, message] of Object.entries(info.fields)) {
+    if (known.has(field)) fieldErrors[field] = message;
+    else unmapped.push(`${field}：${message}`);
+  }
+  if (info.code !== ERROR_CODES.VALIDATION_ERROR || Object.keys(info.fields).length === 0) {
+    return { fieldErrors, formError: unmapped.length > 0 ? `${info.message}（${unmapped.join("；")}）` : info.message };
+  }
+  return { fieldErrors, formError: unmapped.length > 0 ? `${info.message}（${unmapped.join("；")}）` : null };
+}

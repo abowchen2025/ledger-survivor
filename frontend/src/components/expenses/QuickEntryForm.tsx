@@ -8,12 +8,14 @@
  * - 信用卡欄位只在信用卡／行動支付顯示；切回現金／轉帳時清空已選卡片（後端拒絕帶卡的現金花費，spec-gaps 8.5）。
  * - 卡片選單只列啟用中的卡（編輯時保留原本那張，即使已停用，spec-gaps 8.6）。
  * - 送出中按鈕停用，防止連點重複記帳；成功後清空金額、品項、備註、退款，保留日期、分類、支付方式、卡片。
- * - 後端 error.fields 顯示在對應欄位下方，不清空已輸入內容。
+ * - payload 不在這裡拼：一律交給 lib/expense-payload.ts 逐欄位依 ExpenseCreate／ExpenseUpdate 組裝。
+ * - 錯誤處理：送出狀態一律在 finally 重設；後端 error.fields 有對應輸入框的顯示在欄位下方、不清空已輸入內容，
+ *   沒有對應輸入框的併進表單頂部的整體錯誤（含欄位名與訊息），不靜默吞掉。
  */
 import { type FormEvent, useEffect, useId, useState } from "react";
 
 import type { Card } from "@/api/cards";
-import { describeApiError, ERROR_CODES } from "@/api/errors";
+import { describeApiError, ERROR_CODES, splitFieldErrors } from "@/api/errors";
 import type { ExpenseCreate, ExpenseUpdate, PaymentMethod } from "@/api/expenses";
 import { FieldError } from "@/components/FieldError";
 import { FieldSelect } from "@/components/FieldSelect";
@@ -21,49 +23,38 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
+import { type ExpenseFormValues, expenseCreatePayload, expenseUpdatePayload, parseExpenseForm } from "@/lib/expense-payload";
 import { PAYMENT_METHODS, cardFieldMode } from "@/lib/labels";
-import { parseAmountInput } from "@/lib/money";
 import { cn } from "@/lib/utils";
 import { todayTaipei } from "@/lib/week";
 import { cardLabel } from "@/store/card-store";
 import type { CategoryOption } from "@/store/category-store";
 
-export interface QuickEntryValues {
-  date: string;
-  amountInput: string;
-  refund: boolean;
-  item: string;
-  categoryId: number | null;
-  paymentMethod: PaymentMethod;
-  cardId: number | null;
-  note: string;
-}
+/** 表單狀態的型別定義在 lib/expense-payload.ts（payload 組裝與 scripts/payload-dump.ts 共用） */
+export type QuickEntryValues = ExpenseFormValues;
 
-export type QuickEntryPayload = ExpenseCreate & ExpenseUpdate;
+// 畫面上有輸入框、能把後端 error.fields 顯示在欄位下方的欄位；card_id 只在卡片欄位顯示時算
+const BASE_FIELDS = ["date", "amount", "item", "category_id", "payment_method", "note"] as const;
 
-export interface QuickEntryFormProps {
-  mode: "create" | "edit";
+interface QuickEntryFormBaseProps {
   /** 預設值：create 帶今天與上一筆的分類／支付方式；edit 帶既有花費 */
   initial?: Partial<QuickEntryValues>;
   categories: CategoryOption[];
   cards: Card[];
   recentItems?: string[];
-  /** 成功要 resolve；失敗丟出原始錯誤（表單自己解讀 error.fields）。金鑰問題請在外層先攔下導向。 */
-  onSubmit: (payload: QuickEntryPayload) => Promise<void>;
   onCancel?: () => void;
   /** 收到 INACTIVE_REFERENCE 時呼叫（外層重新載入分類／卡片選單） */
   onInactiveReference?: () => void;
   submitLabel?: string;
 }
 
-// SRS 4.5 欄位規格表「檢核失敗文案」（前端檢核與後端同一句）
-const MSG = {
-  date: "請選擇日期",
-  item: "請輸入品項",
-  category: "請選擇分類",
-  card: "請選擇信用卡",
-  note: "備註最多100字",
-} as const;
+/**
+ * onSubmit 依 mode 收不同型別：新增拿 ExpenseCreate（POST）、編輯拿 ExpenseUpdate（PUT），
+ * 物件分別由 lib/expense-payload.ts 的 expenseCreatePayload／expenseUpdatePayload 逐欄位組成。
+ * 成功要 resolve；失敗丟出原始錯誤（表單自己解讀 error.fields）。金鑰問題請在外層先攔下導向。
+ */
+export type QuickEntryFormProps = QuickEntryFormBaseProps &
+  ({ mode: "create"; onSubmit: (payload: ExpenseCreate) => Promise<void> } | { mode: "edit"; onSubmit: (payload: ExpenseUpdate) => Promise<void> });
 
 function defaults(initial: Partial<QuickEntryValues> | undefined): QuickEntryValues {
   return {
@@ -79,17 +70,8 @@ function defaults(initial: Partial<QuickEntryValues> | undefined): QuickEntryVal
   };
 }
 
-export function QuickEntryForm({
-  mode,
-  initial,
-  categories,
-  cards,
-  recentItems = [],
-  onSubmit,
-  onCancel,
-  onInactiveReference,
-  submitLabel,
-}: QuickEntryFormProps) {
+export function QuickEntryForm(props: QuickEntryFormProps) {
+  const { mode, initial, categories, cards, recentItems = [], onCancel, onInactiveReference, submitLabel } = props;
   const uid = useId();
   const [values, setValues] = useState<QuickEntryValues>(() => defaults(initial));
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
@@ -152,57 +134,38 @@ export function QuickEntryForm({
     });
   };
 
-  const validate = (): { payload: QuickEntryPayload | null; errors: Record<string, string> } => {
-    const errors: Record<string, string> = {};
-    const amount = parseAmountInput(values.amountInput, values.refund);
-    if (!amount.ok) errors.amount = amount.message;
-    const item = values.item.trim();
-    if (!item || item.length > 50) errors.item = MSG.item;
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(values.date)) errors.date = MSG.date;
-    if (values.categoryId === null) errors.category_id = MSG.category;
-    if (cardMode === "required" && values.cardId === null) errors.card_id = MSG.card;
-    const note = values.note.trim();
-    if (note.length > 100) errors.note = MSG.note;
-    if (Object.keys(errors).length > 0 || !amount.ok || values.categoryId === null) return { payload: null, errors };
-    return {
-      payload: {
-        date: values.date,
-        amount: amount.value,
-        item,
-        category_id: values.categoryId,
-        payment_method: values.paymentMethod,
-        card_id: cardMode === "hidden" ? null : values.cardId,
-        note: note || null,
-      },
-      errors,
-    };
-  };
-
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     if (submitting) return;
     setFormError(null);
-    const { payload, errors } = validate();
-    if (!payload) {
-      setFieldErrors(errors);
+    const parsed = parseExpenseForm(values);
+    if (!parsed.ok) {
+      setFieldErrors(parsed.errors);
       return;
     }
+    setFieldErrors({});
     setSubmitting(true);
     try {
-      await onSubmit(payload);
+      if (props.mode === "create") {
+        await props.onSubmit(expenseCreatePayload(parsed.fields));
+      } else {
+        await props.onSubmit(expenseUpdatePayload(parsed.fields));
+      }
       if (mode === "create") {
         setValues((v) => ({ ...v, amountInput: "", item: "", note: "", refund: false }));
         setShowNote(false);
-        setFieldErrors({});
       }
     } catch (err) {
       const info = describeApiError(err);
-      setFieldErrors(info.fields);
-      // 有欄位錯誤時整體訊息只在沒有對應欄位可顯示時才出現
-      const unmapped = Object.keys(info.fields).length === 0 || info.code !== ERROR_CODES.VALIDATION_ERROR;
-      setFormError(unmapped ? info.message : null);
+      const known: string[] = [...BASE_FIELDS, ...(cardMode !== "hidden" ? ["card_id"] : [])];
+      const split = splitFieldErrors(info, known);
+      setFieldErrors(split.fieldErrors);
+      setFormError(split.formError);
+      // 備註欄收合時收到 note 的錯誤：展開讓文案看得到
+      if (split.fieldErrors.note) setShowNote(true);
       if (info.code === ERROR_CODES.INACTIVE_REFERENCE) onInactiveReference?.();
     } finally {
+      // 成功、後端拒絕、網路錯誤都要把按鈕從「送出中」放開
       setSubmitting(false);
     }
   };
@@ -219,6 +182,12 @@ export function QuickEntryForm({
 
   return (
     <form className="flex flex-col gap-3" onSubmit={submit} noValidate aria-busy={submitting} data-testid="quick-entry-form">
+      {formError && (
+        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" data-testid="form-error">
+          {formError}
+        </p>
+      )}
+
       <div className="grid grid-cols-[1fr_auto] items-end gap-3">
         <div className="flex flex-col gap-1">
           <Label htmlFor={ids.amount}>金額</Label>
@@ -352,12 +321,6 @@ export function QuickEntryForm({
         <button type="button" className="self-start text-xs text-muted-foreground underline-offset-4 hover:underline" onClick={() => setShowNote(true)}>
           加備註
         </button>
-      )}
-
-      {formError && (
-        <p role="alert" className="rounded-md bg-destructive/10 px-3 py-2 text-sm text-destructive" data-testid="form-error">
-          {formError}
-        </p>
       )}
 
       <div className="flex gap-2">

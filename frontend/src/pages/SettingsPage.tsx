@@ -5,6 +5,8 @@ import type { AuthRedirectState } from "@/api/auth-guard";
 import { ApiKeyForm } from "@/components/ApiKeyForm";
 import { ApiStatus } from "@/components/ApiStatus";
 import { CardManager } from "@/components/cards/CardManager";
+import { CategoryManager } from "@/components/categories/CategoryManager";
+import { IncomeSettings } from "@/components/income/IncomeSettings";
 import { PageTitle } from "@/components/layout/PageTitle";
 
 export default function SettingsPage() {
@@ -16,8 +18,9 @@ export default function SettingsPage() {
       <PageTitle>設定</PageTitle>
       <ApiKeyForm reason={state?.reason} onChange={() => setRefreshToken((n) => n + 1)} />
       <ApiStatus refreshToken={refreshToken} />
-      {/* 收入設定、分類管理下一輪再加 */}
+      <IncomeSettings />
       <CardManager />
+      <CategoryManager />
     </div>
   );
 }

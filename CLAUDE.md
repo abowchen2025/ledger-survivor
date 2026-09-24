@@ -27,8 +27,9 @@
 - `tests/integration/test_week_rule_consistency.py`（TC-SEC-WEEK-004）用 subprocess 跑前端 `npm run week:dump`，比對兩端輸出而非各自對答案（`docs/adr/0005`）；標記 `integration`，需要 Node 22 與 `frontend/node_modules`，缺了會失敗不會 skip
 - `tests/integration/test_frontend_payload_contract.py` 用 subprocess 跑前端 `npm run payload:dump`（`frontend/scripts/payload-dump.ts`，只能呼叫 `lib/card-payload.ts`、`lib/expense-payload.ts` 這些表單真正用的組裝函式），把前端實際產生的 payload 逐筆丟進後端 Pydantic Create／Update schema 驗證（`docs/adr/0008`）。新增業務表單時：組裝函式進 `lib/`、dump 加 case、後端測試的 `SCHEMAS` 與 `REQUIRED_SCENARIOS` 登記
 - `tests/api/test_health.py` 的 `/health/ready` 正常路徑需要本機 DB 已 `alembic upgrade head`；DB 不可用會失敗不會 skip。健康檢查三端點規格見 `docs/spec-gaps.md` 第 6 節（REQ-NFR-008）、`docs/adr/0006`
+- `tests/e2e/`（Playwright Python，marker `e2e`，TC-UI-WEEK-006、TC-E2E-001）**預設不跑**：`pyproject` 的 `addopts = -m "not e2e"`，要跑寫 `uv run pytest -m e2e`；命令列任何 `-m` 都會覆蓋 addopts，所以 CI backend job 是 `-m "not integration and not e2e"`、本機只跑 P0 要寫 `-m "p0 and not e2e"`。需要真的後端（`127.0.0.1:8765`）與前端 production build 的 `vite preview`（`127.0.0.1:4173/ledger-survivor/`）先起好，conftest 輪詢 60 秒後失敗不會 skip；**網址守門**：`E2E_API_URL`／`E2E_BASE_URL` 的 host 只能是 `127.0.0.1` 或 `localhost`，否則直接失敗（e2e 會寫入花費，不得打到 Railway）。金鑰走設定頁輸入（`E2E_API_KEY`，沒設就讀根目錄 `.env` 的 `API_KEY`）存成 storage_state，測試碼不寫死 localStorage 鍵名；選擇器只用 `get_by_role`／`get_by_label`／`get_by_text`，不新增 `data-testid`。環境決定見 `docs/spec-gaps.md` 第 12 節
 - 雲端部署設定（pre-deploy `alembic upgrade head`、Healthcheck Path `/api/v1/health/ready`、target port 8080）只存在 Railway UI，`railway.json` 對本服務無效且已刪除；清單見 `docs/deployment-setup.md` 開頭
-- CI（`.github/workflows/ci.yml`）每個 PR 跑 backend pytest（PostgreSQL service container）+ frontend vitest/build + 一致性測試；P0 測試失敗擋合併
+- CI（`.github/workflows/ci.yml`）每個 PR 跑 backend pytest（PostgreSQL service container）+ frontend vitest/build + 一致性測試 + e2e（Playwright，起 uvicorn 與 vite preview；失敗時上傳 trace 與 uvicorn log）；P0 測試失敗擋合併
 
 ## 核心規則（不可自行改動，動到要先問）
 
@@ -78,7 +79,7 @@ docker compose exec -T db psql -U ledger -d ledger_survivor -c "SELECT id, email
 cd backend; uv sync; uv run alembic upgrade head
 uv run uvicorn app.main:app --reload --port 8765
 uv run pytest -q
-uv run pytest -q -m p0          # 只跑 P0
+uv run pytest -q -m "p0 and not e2e"   # 只跑 P0（命令列 -m 會蓋掉 addopts 的 not e2e，要自己排除）
 
 # 前端
 cd frontend; npm install; npm run dev
@@ -86,6 +87,12 @@ npm run gen:api                 # 從 http://127.0.0.1:8765/openapi.json 產生�
 npm run test
 npm run build                   # 產出 dist/（manifest.webmanifest、sw.js）
 npm run week:dump               # 一致性測試用：前端對 fixture 全部案例的輸出（JSON）
+
+# e2e（Playwright；DB 55432、後端 8765、preview 4173；三個視窗各開一個）
+cd backend; uv run playwright install chromium                      # 第一次
+$env:CORS_ALLOWED_ORIGINS = "http://127.0.0.1:4173"; uv run uvicorn app.main:app --host 127.0.0.1 --port 8765   # 視窗 1（.env 已含 4173 就不用設）
+cd frontend; $env:VITE_API_BASE_URL = "http://127.0.0.1:8765"; npm run build; npx vite preview --host 127.0.0.1 --port 4173 --strictPort   # 視窗 2
+cd backend; uv run pytest -m e2e                                    # 視窗 3；金鑰預設讀根目錄 .env 的 API_KEY，或設 $env:E2E_API_KEY
 ```
 
 ## 回報格式（每輪結束時）
@@ -122,5 +129,7 @@ Phase 1 第三輪（分支 `phase-1-quick-entry`，PR #5，2026-09-23）：前�
 Phase 1 修正輪（分支 `fix-card-create-payload`，2026-09-24）：Pages 新增卡片 400 的修正——payload 改在 `lib/card-payload.ts`、`lib/expense-payload.ts` 逐欄位組裝、新增不送 `is_active`、顏色送出值與畫面一致、`finally` 重設送出狀態、無對應輸入框的欄位錯誤顯示在表單頂部；新增 `npm run payload:dump` 與後端契約測試 `tests/integration/test_frontend_payload_contract.py`（`docs/adr/0008`）。
 
 Phase 1 第四輪（分支 `phase-1-settings-calendar`，2026-09-24）：設定頁收入設定（月份預設遊戲月、月薪三種狀態、額外收入、固定支出含過期灰階）、設定頁分類管理（一級唯讀、二級 CRUD、刪除 200／204 兩種結果、共用 `category-store`）、月曆頁（`lib/calendar-grid.ts` 以 week.ts 產生格線、跨月週標籤、每日與每週合計排除獎勵、點日期沿用 `WeekExpenseList`）。新寫入全部進 `payload:dump` 與契約測試。規格決定見 `docs/spec-gaps.md` 第 9 節。
+
+Phase 1 e2e 輪（分支 `phase-1-e2e`，PR #10，2026-09-25）：Playwright Python e2e（`backend/tests/e2e/`，marker `e2e` 預設排除、網址守門、金鑰走設定頁存 storage_state）、TC-UI-WEEK-006 月曆跨月週標籤、TC-E2E-001 拆成清單（通過）與 HP（strict xfail）兩個函式、CI 新增 `e2e (Playwright)` job。環境決定見 `docs/spec-gaps.md` 第 12 節。
 
 已完成：Phase 0a（後端骨架、12 張表、seed、`week_rule` 測試）、Phase 0b（前端骨架六頁、PWA、前後端 `week_rule` 一致性測試 TC-SEC-WEEK-004、CI 三條 workflow、Dockerfile、README；`railway.json` 已刪除，Railway 設定只在 UI）。路由方式 HashRouter 已採納（`docs/adr/0004`）；雲端 migration 走 Railway pre-deploy、健康檢查拆 live／ready（`docs/adr/0006`）。Pages 與 Railway 皆已上線，見 `docs/deployment-setup.md` 開頭「目前狀態」。

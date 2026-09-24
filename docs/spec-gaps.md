@@ -17,6 +17,7 @@
 | 9 | Phase 1 前端三個畫面的呈現決定（9.1～9.10）＋ 9.11 技術債 | **待回收** |
 | 10 | Phase 2 可支配金額：`salary` 為 `null` 的處理 | 已寫入 SRS v1.6.1（REQ-INCOME-006） |
 | 11 | SRS v1.6.1 已知待同步項（11.1～11.4） | **待回收**（下一個 docs PR） |
+| 12 | Playwright e2e 執行環境決定（12.1～12.6）＋ TC-E2E-001 拆成兩個函式 | **待回收**（12.6 的 YAML `script` 改登記在下一個 docs PR） |
 
 
 ### 1. 唯一約束（已回收，SRS v1.3）
@@ -264,3 +265,20 @@
 | 11.4 | 前後端 payload 契約沒有對應 REQ | `TC-FUNC-CONTRACT-001～003` 暫掛 REQ-NFR-010（「未知欄位 → 400」那一項）；新增 **REQ-NFR-011**（前後端資料形狀一致，依據 ADR-0008：前端實際產生的 payload 必須被後端 Pydantic Create／Update schema 接受）後改掛 | 五、5.2 NFR 表新增一列＋詳細規格；YAML 三條 `req` 改掛 |
 
 小節 11 為 2026-09-24 新增（PR #9 審查意見）。
+
+### 12. Playwright e2e 執行環境決定（2026-09-25 ABow 決定；**已實作**，分支 `phase-1-e2e`，PR #10）
+
+**為什麼是規格缺口**：測試條件 TC-UI-WEEK-006 與 TC-E2E-001 的 `script` 指向 `tests/e2e/`，但 SRS 與測試條件都沒有寫 e2e 的執行環境（起哪些服務、怎麼給金鑰、怎麼防止打到正式環境），而 TC-E2E-001 的 `expected` 同時涵蓋 Phase 1 已有與 Phase 2／3 才有的畫面。以下每一項由 ABow 指示或實作時補定。
+
+**實作位置**：`backend/tests/e2e/conftest.py`（12.1～12.4）、`backend/tests/e2e/test_calendar_view.py`、`backend/tests/e2e/test_expense_to_hp.py`（12.5～12.6）、`.github/workflows/ci.yml` 的 `e2e (Playwright)` job、`backend/pyproject.toml`（marker 與 addopts）。
+
+| # | 項目 | 決定（已實作） | 待 SRS／測試條件補述 |
+|---|---|---|---|
+| 12.1 | 工具與位置 | Playwright Python（`pytest-playwright`，dev dependency group），測試放 `backend/tests/e2e/`，marker `e2e`。**預設不跑**：`pyproject` 的 `addopts = -m "not e2e"`；命令列的 `-m` 會覆蓋它，所以 CI backend job 改為 `-m "not integration and not e2e"`，本機只跑 P0 要寫 `-m "p0 and not e2e"` | 測試條件檔頭補「e2e 類別需先起服務」 |
+| 12.2 | 執行環境一律 127.0.0.1 | 後端 uvicorn `127.0.0.1:8765`（`DEBUG=false`、`API_KEY` 用 CI 既有假值、`CORS_ALLOWED_ORIGINS=http://127.0.0.1:4173`）；前端以 `VITE_API_BASE_URL=http://127.0.0.1:8765` 執行 `npm run build`，由 `vite preview --host 127.0.0.1 --port 4173 --strictPort` 提供，網址 `http://127.0.0.1:4173/ledger-survivor/`（與 Pages 同一個 base）。測的是 production build，不是 dev server | — |
+| 12.3 | 網址守門 | 網址由 `E2E_BASE_URL`／`E2E_API_URL` 提供（預設即 12.2 的值）；conftest 檢查兩者的 host 必須是 `127.0.0.1` 或 `localhost`，否則在 session 開始就失敗並說明原因。e2e 會真的寫入花費，**任何情況下不得連到 Railway**。session 開始時輪詢 `/api/v1/health/ready` 與前端首頁最多 60 秒，逾時失敗並列出缺哪一個、本機怎麼起 | — |
+| 12.4 | 金鑰與瀏覽器 | 金鑰值來自 `E2E_API_KEY`（沒設就讀 repo 根目錄 `.env` 的 `API_KEY`）；session fixture 走設定頁用 `getByLabel` 輸入、按「儲存」，把 `storage_state` 交給所有測試——測試碼不寫死 localStorage 鍵名（ADR-0007 的實作細節）。瀏覽器 Chromium、390×844、`is_mobile`、`has_touch`、`zh-TW`、`Asia/Taipei`、`service_workers="block"`。選擇器只用 `get_by_role`／`get_by_label`／`get_by_text`；為此 `ApiKeyForm` 的 `<form>` 補 `aria-label="API 金鑰"`（設定頁有多個「儲存」鈕，要靠表單名稱區分） | — |
+| 12.5 | TC-UI-WEEK-006 的做法 | 不假造瀏覽器時間：在月曆頁用「上一月／下一月」按鈕從今天所屬月份切到 2026-09 與 2026-10（最多 36 次，超過即失敗）。兩個月份都要看到 9/28（一）與 10/4（日）的格子，且「這週算 10 月」標籤可見（regex 容許空白差異；10 月份另有 10/26～11/1 一列也算 10 月，所以只斷言至少一個） | REQ-UI-001 驗收條件可直接引用 |
+| 12.6 | TC-E2E-001 拆成兩個函式 | YAML 登記 `test_expense_to_hp.py::test_record_expense_updates_home_hp`，但 expected 含 Phase 1 已有的「即時出現在本週清單、不整頁重整」與 Phase 2／3 的「剩餘額度、HP 條同步更新」。拆成同一檔案兩個函式：`test_record_expense_updates_home_week_list`（現在要過：唯一品項字串、日期預設今天、送出後清單出現該筆、送出前放在 `window` 的標記仍在＝沒有整頁重載）與 `test_record_expense_updates_home_hp`（`xfail(strict=True, raises=AssertionError)`：斷言剩餘額度文字與 HP `progressbar`；實作後 XPASS 變紅，屆時移除 xfail；`raises` 限定只有斷言失敗算 xfail，環境錯誤照樣紅）。兩個函式的 teardown 都用 API（httpx 帶金鑰）刪掉自己建立的花費 | **YAML 的 `script` 待下一個 docs PR 改登記**：TC-E2E-001 拆成兩條或改指 `test_record_expense_updates_home_week_list`，由規劃者決定 |
+
+小節 12 為 2026-09-25 新增（Phase 1 e2e 輪，PR #10）。

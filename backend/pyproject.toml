@@ -18,6 +18,7 @@ dev = [
     "pytest>=8.3",
     "pytest-asyncio>=0.24",
     "httpx>=0.27",
+    "pytest-playwright>=0.7",
 ]
 
 [build-system]
@@ -34,7 +35,11 @@ markers = [
     "p0: P0 core tests, must pass before merge",
     "p1: P1 tests",
     "integration: cross-language tests that need Node.js 22 + frontend/node_modules (npm ci)",
+    "e2e: Playwright browser tests against a running backend (127.0.0.1:8765) + frontend preview (127.0.0.1:4173); see tests/e2e/conftest.py",
 ]
+# e2e 需要兩個服務先起好，預設不跑：只有明確 `-m e2e` 才會選到（命令列的 -m 覆蓋這裡）。
+# 反過來說，任何命令列 -m（例如 -m p0）都會把這條覆蓋掉，要排除 e2e 得自己寫 -m "p0 and not e2e"。
+addopts = "-m \"not e2e\""
 # 只忽略下列兩個「來自第三方套件、與本專案程式碼無關」的 DeprecationWarning，
 # 以 message + 發出模組做最窄比對，不做全域 ignore::DeprecationWarning。
 # 其他 warning 一律照常顯示，出現新 warning 就是要看的訊號。

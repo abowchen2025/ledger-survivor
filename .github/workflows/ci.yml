@@ -1,6 +1,7 @@
 # CI：每個 PR 跑後端 pytest（含 PostgreSQL service container）、前端 vitest + build、
-# 前後端 week_rule 一致性測試（TC-SEC-WEEK-004）與前端 payload 契約測試（tests/integration/）。
-# P0 測試失敗擋合併（在 GitHub 分支保護規則把三個 job 設為 required check；job 的 name 是 required check
+# 前後端 week_rule 一致性測試（TC-SEC-WEEK-004）與前端 payload 契約測試（tests/integration/）、
+# Playwright e2e（tests/e2e/，起真的後端與前端 preview）。
+# P0 測試失敗擋合併（在 GitHub 分支保護規則把 job 設為 required check；job 的 name 是 required check
 # 的名稱，改了名會讓保護規則等不到結果，所以 consistency job 名稱維持不變）。
 name: CI
 
@@ -70,8 +71,9 @@ jobs:
         run: uv run alembic check
 
       - name: pytest (unit + api)
-        # integration 由下方 consistency job 跑（需要 Node）
-        run: uv run pytest -q -m "not integration"
+        # integration 由下方 consistency job 跑（需要 Node）；e2e 由 e2e job 跑（需要瀏覽器與兩個服務）。
+        # 命令列的 -m 會覆蓋 pyproject addopts 的 -m "not e2e"，所以這裡要把 e2e 一起排除。
+        run: uv run pytest -q -m "not integration and not e2e"
 
   frontend:
     name: frontend vitest + build
@@ -134,3 +136,100 @@ jobs:
         # test_frontend_payload_contract.py：npm run payload:dump 產生的實際 payload 丟進 Pydantic Create／Update schema
         run: uv run pytest -q tests/integration
         working-directory: backend
+
+  e2e:
+    name: e2e (Playwright)
+    # TC-UI-WEEK-006、TC-E2E-001：真的起後端（uvicorn 127.0.0.1:8765）與前端 production build（vite preview 127.0.0.1:4173），
+    # 用 Chromium 手機視窗跑 backend/tests/e2e/。兩個服務都綁 127.0.0.1，conftest 另有網址守門，不會打到 Railway。
+    runs-on: ubuntu-latest
+    services:
+      db:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ledger
+          POSTGRES_PASSWORD: ledger
+          POSTGRES_DB: ledger_survivor
+          TZ: Asia/Taipei
+          PGTZ: Asia/Taipei
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ledger -d ledger_survivor"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql+psycopg://ledger:ledger@localhost:5432/ledger_survivor
+      TZ: Asia/Taipei
+      # 後端：與 backend job 同一把 CI 假金鑰；DEBUG=false 與 Railway 一致；CORS 只放前端 preview 的來源
+      API_KEY: ci-only-not-a-secret
+      DEBUG: "false"
+      CORS_ALLOWED_ORIGINS: http://127.0.0.1:4173
+      # 前端 build：API 位址指向本 job 的 uvicorn（只到 host[:port]）
+      VITE_API_BASE_URL: http://127.0.0.1:8765
+      # e2e conftest 讀的三個變數（預設值就是這些，寫出來讓 job 一目了然）
+      E2E_API_URL: http://127.0.0.1:8765
+      E2E_BASE_URL: http://127.0.0.1:4173/ledger-survivor/
+      E2E_API_KEY: ci-only-not-a-secret
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Set up uv + Python
+        uses: astral-sh/setup-uv@v10.2.0
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          enable-cache: true
+          cache-dependency-glob: backend/uv.lock
+
+      - name: Install backend dependencies
+        run: uv sync --frozen
+        working-directory: backend
+
+      - name: Alembic upgrade head (0002 已含 seed：user 1、內建分類)
+        run: uv run alembic upgrade head
+        working-directory: backend
+
+      - name: Start backend (uvicorn 127.0.0.1:8765, background)
+        # 背景程序會活到 job 結束；log 寫檔，失敗時當 artifact 上傳
+        run: nohup uv run uvicorn app.main:app --host 127.0.0.1 --port 8765 > uvicorn.log 2>&1 &
+        working-directory: backend
+
+      - name: Install frontend dependencies
+        run: npm ci
+        working-directory: frontend
+
+      - name: Build frontend (VITE_API_BASE_URL → 127.0.0.1:8765)
+        run: npm run build
+        working-directory: frontend
+
+      - name: Start frontend preview (vite preview 127.0.0.1:4173, background)
+        run: nohup npx vite preview --host 127.0.0.1 --port 4173 --strictPort > preview.log 2>&1 &
+        working-directory: frontend
+
+      - name: Install Playwright Chromium (+ system deps)
+        run: uv run playwright install --with-deps chromium
+        working-directory: backend
+
+      - name: pytest -m e2e (Playwright)
+        # conftest 會先輪詢 /api/v1/health/ready 與前端首頁最多 60 秒；trace 只在失敗時保留到 test-results/
+        run: uv run pytest -m e2e --tracing retain-on-failure
+        working-directory: backend
+
+      - name: Upload Playwright traces + server logs
+        if: failure()
+        uses: actions/upload-artifact@v6
+        with:
+          name: e2e-failure-artifacts
+          if-no-files-found: ignore
+          retention-days: 7
+          path: |
+            backend/test-results/
+            backend/uvicorn.log
+            frontend/preview.log

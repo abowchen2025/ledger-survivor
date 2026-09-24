@@ -1,6 +1,6 @@
 """信用卡繳款月偏移推算與 31 日邊界（REQ-CARD-002、REQ-CARD-006；TC-EDGE-CARD-001、TC-EDGE-CARD-002）。
 
-純函式測試，不碰資料庫。函式名稱與 docs/test_conditions_v1_1.yaml 的 script 欄位一致。
+純函式測試，不碰資料庫。函式名稱與 docs/test_conditions_v1_2.yaml 的 script 欄位一致。
 """
 
 import json

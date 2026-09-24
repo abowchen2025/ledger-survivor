@@ -1,0 +1,5 @@
+# Shell scripts must be LF in the index and in every checkout: bash on the Linux runners fails on CRLF ("$: command not found").
+# core.autocrlf=true on the Windows dev machine already normalizes commits to LF, but a checkout there produces CRLF;
+# eol=lf keeps *.sh LF on disk everywhere and protects against a contributor without autocrlf.
+# Only *.sh is pinned; do not add a blanket "* text=auto" without renormalizing in a dedicated commit.
+*.sh text eol=lf

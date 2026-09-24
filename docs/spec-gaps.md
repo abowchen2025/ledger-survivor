@@ -1,17 +1,31 @@
 # 規格缺口（實作已決定、待 SRS+FS 補述）
 
-實作走在 SRS 前面的地方都記在這裡，由 ABow 統一帶回 `docs/srs_fs_v1_2.md`。補進 SRS 後把該列刪除。
+實作走在 SRS 前面的地方都記在這裡。**SRS 自 v1.6 起由開發端規劃者維護**：實作中發現的規格缺口一律記入本檔最新一節，
+不直接改 SRS；SRS 的修改只在規劃者指示的 docs PR 中進行（例如 PR `docs-srs-v1-6` 把 v1.6 帶進 repo 為 v1.6.1）。
+已回收的小節**不刪**（SRS v1.6 正文多處以「見 docs/spec-gaps.md 8.2」引用），只在標題標記狀態。
 資料庫層的實際定義以 `backend/alembic/versions/0001_initial_schema.py` 為準。
 
+## 各節回收狀態
 
-### 1. 唯一約束
+| 小節 | 內容 | 狀態 |
+|---|---|---|
+| 1～4 | 唯一約束、CHECK 格式、`necessity = excluded` 與基準總和、欄位型別 | 已回收至 SRS v1.3（v1.6 沿用） |
+| 5 | REQ-AUTH-000 臨時 API 金鑰閘門 | 已回收至 SRS v1.6（v1.3 首次回收，v1.6 依 2026-09-23 改寫版重新回收） |
+| 6 | REQ-NFR-008 健康檢查三端點 | 已回收至 SRS v1.3（v1.6 沿用） |
+| 7 | REQ-NFR-009 CORS 來源白名單 | 已回收至 SRS v1.6 |
+| 8 | Phase 1 核心 API 決定（8.1～8.10） | 已回收至 SRS v1.6（8.1 → REQ-NFR-010，8.2 → 四章權限段落，8.3～8.10 → 各模組 API 表與 REQ 補述） |
+| 9 | Phase 1 前端三個畫面的呈現決定（9.1～9.10）＋ 9.11 技術債 | **待回收** |
+| 10 | Phase 2 可支配金額：`salary` 為 `null` 的處理 | 已寫入 SRS v1.6.1（REQ-INCOME-006） |
+
+
+### 1. 唯一約束（已回收，SRS v1.6）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
 | `category_groups` 唯一約束 | `unique(user_id, code)`，約束名 `uq_category_groups_user_code` | 第三章 `category_groups` 加 `unique(user_id, code)` |
 | `categories` 唯一約束 | `unique(user_id, group_id, name)`，約束名 `uq_categories_user_group_name` | 第三章 `categories` 加 `unique(user_id, group_id, name)`；同組下二級分類名稱不可重複 |
 
-### 2. CHECK 格式限制
+### 2. CHECK 格式限制（已回收，SRS v1.6）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
@@ -19,7 +33,7 @@
 | 所有 `month` 類欄位格式 | `VARCHAR(7)` + `CHECK (col ~ '^[0-9]{4}-(0[1-9]\|1[0-2])$')`，套用於 `monthly_incomes.month`、`extra_incomes.month`、`recurring_expenses.start_month`／`end_month`（可 NULL）、`installments.first_month`、`reward_ledger.month` | 明確寫出 `YYYY-MM` 格式且月份限 01～12 |
 | `credit_cards.color` 格式 | `VARCHAR(7)` + `CHECK (color IS NULL OR color ~ '^#[0-9A-Fa-f]{6}$')` | `color` 為 `#RRGGBB` 十六進位，可為 NULL |
 
-### 3. `necessity = excluded` 與基準總和排除規則
+### 3. `necessity = excluded` 與基準總和排除規則（已回收，SRS v1.6）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
@@ -27,7 +41,7 @@
 | 基準總和檢查排除 REWARD | `benchmark_min_pct`／`max_pct` 對 REWARD 維持 NULL；REQ-CATEGORY-004 的 90～110% 總和檢查只計算 `counts_toward_target = true` 的分類 | REQ-CATEGORY-004 加註「只計 `counts_toward_target = true` 的分類，REWARD 不參與」；REWARD 的基準欄位允許 NULL |
 | 基準總和檢查的定義（規格漏洞，2026-09-21 ABow 決定） | 架構描述 6.5 與 REQ-CATEGORY-004 只寫「總和落在 90～110%」，未定義用 min、max 或中點。內建 6 類目前 min 合計 70%、max 合計 115%、中點合計 92.5%。決定改為兩層檢查，**Phase 3 才實作，本輪只記錄**：①硬性檢查（擋下）：`min 合計 ≤ 100 ≤ max 合計`，各類區間須能容納一組真實的 100% 分配，目前 70 ≤ 100 ≤ 115 通過；②軟性提示（只警告不擋）：中點合計落在 90～110%，目前 92.5% 通過。兩層都只計 `counts_toward_target = true` 的分類 | REQ-CATEGORY-004 改寫為上述兩層檢查，並註明硬性／軟性的差別（擋下 vs 提示）；架構描述 6.5 第 2 條同步修改 |
 
-### 4. 欄位型別決定（SRS 寫「—」者）
+### 4. 欄位型別決定（SRS 寫「—」者）（已回收，SRS v1.6）
 
 | 項目 | 目前實作 | 待 SRS 補述 |
 |---|---|---|
@@ -46,7 +60,7 @@
 | 同上：`achievements` | `code VARCHAR(50)`、`unlocked_at TIMESTAMPTZ DEFAULT now()` | 補型別 |
 | 金額精度 | 所有金額 `NUMERIC(12,2)`，保留兩位小數（分期每期金額除不盡時用到） | 第三章加一句金額型別統一 `NUMERIC(12,2)` |
 
-### 5. 無認證期的臨時 API 金鑰閘門（REQ-AUTH-000，2026-09-21 ABow 決定；**已實作**，2026-09-22，分支 `phase-1-auth-cors`）
+### 5. 無認證期的臨時 API 金鑰閘門（REQ-AUTH-000，2026-09-21 ABow 決定；**已實作**，2026-09-22，分支 `phase-1-auth-cors`）（已回收，SRS v1.6）
 
 **為什麼是規格缺口**：REQ-AUTH-* 排在 Phase 3。Phase 1～2 之間後端部署在 Railway 的公開網址上，沒有任何認證，而這段期間會用真實財務資料連續記帳。repo 改為 public（2026-09-21 決定，見架構描述 10.1）不改變這件事，只是讓網址更容易被找到。原規格漏掉了這段「無認證期」。
 
@@ -71,7 +85,7 @@
 | **新增缺口：401 回應格式** | `401`，body 固定 `{"detail": "unauthorized"}`，`Content-Type: application/json`；不帶 `WWW-Authenticate`（沒有瀏覽器原生驗證流程要觸發） | 條文；日後 API 錯誤格式統一時一起定 |
 | **新增缺口：CORS 預檢不經閘門** | 瀏覽器預檢 `OPTIONS` 不帶 `X-API-Key`，由 `CORSMiddleware` 在路由前回應，不會被 401（`tests/api/test_cors.py::test_preflight_for_health_does_not_require_api_key`）。金鑰的傳遞方式（自訂標頭）與 CORS 的關係見第 7 節 | 條文加註 |
 
-### 6. 健康檢查端點（REQ-NFR-008，2026-09-21 ABow 決定；**已實作**於 Phase 0b 收尾，測試條件 2026-09-22 進 `docs/test_conditions_v1_1.yaml`）
+### 6. 健康檢查端點（REQ-NFR-008，2026-09-21 ABow 決定；**已實作**於 Phase 0b 收尾，測試條件 2026-09-22 進 `docs/test_conditions_v1_1.yaml`）（已回收，SRS v1.6）
 
 **為什麼是規格缺口**：健康檢查現在是部署的守門員（Railway healthcheck 指向它，決定新版本是否切流量），是有行為、可測試的需求，不該只活在程式碼裡。SRS 目前沒有任何條文定義 health 端點。決策理由見 `docs/adr/0006`。
 
@@ -87,7 +101,7 @@
 | 測試條件（已實作於 `tests/api/test_health.py`，已進 `docs/test_conditions_v1_1.yaml`） | `TC-FUNC-HEALTH-001` live 在 DB 不可達時仍 200；`002` ready 在 DB 到 head 時 200 且 `db_revision == code_head`；`003` revision 不符 → 503 degraded、`migration.ok=false`；`004` DB 不可達 → 503、`checks.db=error`、回應不含連線細節；`005` `/health` 維持 `{"status":"ok"}` | req 回追 REQ-NFR-008 |
 | 與 REQ-AUTH-000 的關係 | 三個端點是金鑰閘門的**唯一**豁免（`TC-SEC-AUTH-000d`） | 條文加註 |
 
-### 7. CORS 來源白名單（REQ-NFR-009，2026-09-22 ABow 決定規格；**已實作**，分支 `phase-1-auth-cors`）
+### 7. CORS 來源白名單（REQ-NFR-009，2026-09-22 ABow 決定規格；**已實作**，分支 `phase-1-auth-cors`）（已回收，SRS v1.6）
 
 **為什麼是規格缺口**：前端在 GitHub Pages（`https://abowchen2025.github.io`）、後端在 Railway，是跨來源；REQ-AUTH-000 用自訂標頭 `X-API-Key`，瀏覽器對每個跨來源請求都會先送 `OPTIONS` 預檢。SRS 第五章沒有任何 CORS 條文。編號 `REQ-NFR-009` 是本檔暫定，供 `docs/test_conditions_v1_1.yaml` 的 `req` 欄回追，待 ABow 帶回 SRS 時確認或改號。
 
@@ -107,7 +121,7 @@
 | **新增缺口：前端建置期變數** | 只有 `VITE_API_BASE_URL`（只到 host[:port]，不含 `/api/v1`），Pages 由同名 GitHub Secret 注入，缺了 build 失敗。`VITE_DEV_API_KEY` 只是本機 dev 預設值，production build 忽略。`frontend/src/api/client.ts` 是後端呼叫唯一入口（帶 base URL 與 `X-API-Key`，非 2xx 丟 `ApiError`）。金鑰本身見第 5 節與 `docs/adr/0007` | 架構描述 6.x 或 SRS 第五章補「前端設定」；README 已列 |
 | **新增缺口：設定頁金鑰欄位與後端連線狀態** | `frontend/src/components/ApiKeyForm.tsx`：金鑰輸入、儲存到 `localStorage`、清除、顯示目前來源（已儲存／開發預設／尚未設定），從其他頁被導過來時顯示原因；`ApiStatus.tsx` 打 `GET /auth/me` 顯示連線結果（正常／尚未設定金鑰／401／連不上），存完金鑰立刻重查 | SRS 4.x 設定頁畫面補「API 金鑰」與「後端連線」兩個區塊（Phase 3 移除金鑰區塊） |
 
-### 8. Phase 1 核心 API 決定（2026-09-23 ABow 決定；**已實作**，分支 `phase-1-core-api`）
+### 8. Phase 1 核心 API 決定（2026-09-23 ABow 決定；**已實作**，分支 `phase-1-core-api`）（已回收，SRS v1.6）
 
 **為什麼是規格缺口**：SRS 4.1、4.2、4.5、4.7 的 API 表只寫狀態碼與觸發條件，沒有定義錯誤回應的格式、使用者隔離的行為、額外收入的端點、月薪沿用的讀取方式、行動支付綁卡的判定、停用參照的處理、「所屬月份已結算」的判定基準、深夜記帳的時區。以下每一項都是實作前必須定的，由 ABow 決定後照做。
 
@@ -219,5 +233,20 @@
 | 9.8 | 二級分類刪除的兩種結果 | 確認文案「刪除『X』？若已有花費紀錄，將改為停用」；後端 204 → 從清單移除並提示「已刪除」；200 → 該列改為停用（灰階＋「已停用」徽章）、列下方與浮動提示都顯示「此分類已有花費紀錄，已改為停用」。`DUPLICATE_NAME`（409，body 無 `fields`）由前端掛到名稱欄位下方。改名 PUT 送整筆（`group_id`／`sort_order`／`is_active` 沿用既有值）；停用／啟用只翻 `is_active`。一級分類標籤列唯讀，畫面註明「一級分類名稱與基準之後才能編輯」 | 4.7 API 表 DELETE 列加註前端行為；REQ-CATEGORY-007 提示文案由「將改為停用」改為已完成式「已改為停用」 |
 | 9.9 | 分類異動與快速記帳選單同步 | 分類管理的所有寫入都經 `category-store`（新增 append、改名／停用 replace、刪除 filter），首頁快速記帳與月曆頁讀同一份 store，不各自快取 | — |
 | 9.10 | 月曆頁的編輯／刪除 | 點日期展開明細沿用首頁 `WeekExpenseList`（含編輯表單與刪除確認）；成功後就地更新月曆頁狀態，改到格線範圍外的日期就從本頁消失；首頁本週清單在回首頁時重新載入 | 4.5 版面結構「點擊展開明細（沿用首頁清單元件）」對應 |
+| 9.11 | **技術債**：vitest `testTimeout` 放寬到 20 秒（PR #8） | 全套 17 個測試檔並行時，單一 user-event 測試在開發機超過預設 5 秒；逾時測試殘留的鍵盤事件漏進下一個測試（`CardForm.test.tsx` 斷言看到「0主卡」）。放寬逾時只是讓它比較不容易發生，**沒有消除測試隔離問題**：待查清楚是哪個測試沒有正確清理（候選：`userEvent.setup()` 未隨測試結束中止的非同步輸入、jsdom 環境在 threads pool 下的重用），查明後把 `testTimeout` 改回預設。2026-09-24 ABow 接受為本輪技術債 | 非規格項，不回收 SRS；追蹤到修掉為止 |
 
-小節 9 為 2026-09-24 新增（Phase 1 第四輪：設定頁收入設定、分類管理、月曆頁）。
+小節 9 為 2026-09-24 新增（Phase 1 第四輪：設定頁收入設定、分類管理、月曆頁）；9.11 為同日 PR #8 審查後追加的技術債。
+
+### 10. Phase 2 可支配金額：`salary` 為 `null` 的處理（2026-09-24 ABow 決定；**已寫入 SRS v1.6.1**，REQ-INCOME-006）
+
+**為什麼是規格缺口**：SRS v1.6 附錄「回收矛盾清單」第 4 項——8.4 決定任何月份都沒有月薪紀錄時 `GET /months/{yyyy-mm}/income` 的 `salary` 為 `null`，但 REQ-INCOME-006／007 的公式假設 `salary` 是數字，兩條 REQ 之間缺一個銜接規則。
+
+| 項目 | 決定（已寫入 SRS v1.6.1） | 實作 |
+|---|---|---|
+| 月可支配 | `salary` 為 `null` 時，月可支配與該月所有週的週上限預設皆為 `null`，**不是 0** | Phase 2 |
+| 計分 | 週上限為 `null` 的週不計分、不影響連勝 | Phase 2 |
+| 畫面 | 首頁與月曆以「請先設定月薪」取代剩餘額度與 HP | Phase 2 |
+| 理由 | 當成 0 會讓每一週都「超支」、分數全部為負，等於懲罰使用者還沒完成設定；沒有上限的週，計分本身沒有意義 | — |
+| 何時出現 | 只在「從未設定過任何月份的月薪」時；有任何一個月的紀錄就依 REQ-INCOME-002 往前沿用 | 既有 `services/income.py::resolve_month_income` |
+
+小節 10 為 2026-09-24 新增，隨 SRS v1.6.1 一起寫入（PR `docs-srs-v1-6`），不需再回收。

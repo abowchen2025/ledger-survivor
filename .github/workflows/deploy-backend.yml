@@ -49,17 +49,17 @@ jobs:
       # REQ-AUTH-000 fail closed：沒有 API_KEY 連 alembic（import app.config）都起不來。CI 用固定假值，不是機密。
       API_KEY: ci-only-not-a-secret
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node (for the consistency test)
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: npm
           cache-dependency-path: frontend/package-lock.json
 
       - name: Set up uv + Python
-        uses: astral-sh/setup-uv@v6
+        uses: astral-sh/setup-uv@v10.2.0
         with:
           python-version: ${{ env.PYTHON_VERSION }}
           enable-cache: true
@@ -88,20 +88,25 @@ jobs:
     needs: test
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Set up Node
-        uses: actions/setup-node@v4
+        uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
       - name: Install Railway CLI
         run: npm install -g @railway/cli
 
-      - name: Deploy backend/ to Railway
+      - name: Deploy backend/ to Railway (retry upload-phase network errors only)
         # railway up 會把 backend/ 目錄上傳，Railway 以 Dockerfile builder 建置；
-        # 啟動指令、pre-deploy migration、healthcheck 都設定在 Railway UI（config-as-code 對本服務不可用）
-        run: railway up --service "${{ vars.RAILWAY_SERVICE || 'backend' }}" --ci
+        # 啟動指令、pre-deploy migration、healthcheck 都設定在 Railway UI（config-as-code 對本服務不可用）。
+        # 重試邏輯在 .github/scripts/railway-up-retry.sh：只對「上傳被接受前的網路錯誤」重試（最多 3 次，間隔 10、30 秒；
+        # 2026-09-23 run #9 就是這種：Uploading... → error sending request … operation timed out）。
+        # 建置／部署失敗（log 已出現 Deployment: 之後）與無法分類的錯誤不重試，每次嘗試的輸出都完整保留在 log。
+        # 已知副作用：第一次其實上傳成功、只是回應逾時 → 重試會多一筆相同程式碼的部署（無害，Deployments 頁多一列）。
+        run: bash ../.github/scripts/railway-up-retry.sh
         working-directory: backend
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
+          RAILWAY_SERVICE: ${{ vars.RAILWAY_SERVICE || 'backend' }}

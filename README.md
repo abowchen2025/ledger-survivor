@@ -7,7 +7,7 @@
 - 資料庫：PostgreSQL 16（本機用 Docker Compose，不用 SQLite）
 - 時區固定 `Asia/Taipei`，日期欄位用 `DATE`
 
-規格與決策文件在 `docs/`（`srs_fs_v1_2.md`、`test_conditions_v1_1.yaml`、`architecture_v2_2.md`、`adr/`），開發規範在 `CLAUDE.md`。
+規格與決策文件在 `docs/`（`srs_fs_v1_6_1.md`、`test_conditions_v1_2.yaml`、`adr/`、`architecture_v2_2.md`；規格缺口記在 `spec-gaps.md`），開發規範在 `CLAUDE.md`。
 
 ## 目錄
 

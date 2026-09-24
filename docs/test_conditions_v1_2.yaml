@@ -1,8 +1,9 @@
-# 記帳生存遊戲（Ledger Survivor）測試條件 v1.1
-# 日期：2026-09-22（首版 2026-09-16）
-# 依據：SRS+FS v1.2（req 欄回追對應 REQ 編號；v1.2 只補 REQ 編號與追溯矩陣，業務規則與 v1.1 零變動）、
-#       架構描述 v2.2 第11節（品質與驗證，11.5高風險區重點覆蓋）、
-#       docs/spec-gaps.md 第 5～7 節（REQ-AUTH-000、REQ-NFR-008、REQ-NFR-009，待 SRS 補述的規格）
+# 記帳生存遊戲（Ledger Survivor）測試條件 v1.2
+# 日期：2026-09-24（首版 2026-09-16）
+# 依據：SRS+FS v1.6.1（req 欄回追對應 REQ 編號；第 5～8 節規格缺口已回收進 SRS，本檔不再引用 spec-gaps 作為規格來源）、
+#       架構描述 v2.2 第11節（品質與驗證，11.5高風險區重點覆蓋）
+# 合併：以 v1.1（78 條）為基底，依序併入《測試條件 v1.3 補充》（5 條）、《v1.4 補充》（2 條）、《v1.5 補充》（1 條），
+#       並登記 repo 已有測試但 YAML 未登記的條目（REQ-NFR-010 統一錯誤格式、使用者隔離、已結算月份判定、前端 payload 契約測試）
 # 格式骨架：rachel-qa TC 格式（分類標準：AUTH／SEC／FUNC／UI／E2E／EDGE／NEG／PERF）
 # 用途：Claude Code 讀取本檔案後，依 script 路徑產生對應測試碼；執行結果回填 actual／status 供規劃端判讀
 # 優先級：P0（核心不可妥協，上線前必過）／P1（重要）／P2（次要，可延後）
@@ -104,6 +105,15 @@
   preconditions: 卡片已被至少一筆 expenses 或 installments 引用
   action: DELETE /cards/{id}
   expected: HTTP 403，回應訊息提示改用停用
+
+- id: TC-SEC-CARD-005
+  req: REQ-NFR-005
+  category: SEC
+  priority: P0
+  script: tests/api/test_cards.py::test_other_users_cards_are_invisible
+  preconditions: 直接在 DB 插入 user_id=2 的信用卡；請求以 user 1 的金鑰送出（user_id 來自認證 dependency，不是請求參數）
+  action: GET 清單；GET／PUT／DELETE /cards/{id} 指向 user_id=2 的那筆
+  expected: 清單不出現他人資料；by id 一律回 404（不是 403，不透露資料存在）；DB 資料不變（spec-gaps 8.2 → SRS v1.6 四章開頭權限段落）
 
 # ============================================================
 # 模組：INSTALL — 分期（11.5最高風險：首期月推算錯誤、兩個時鐘混用）
@@ -279,6 +289,51 @@
   action: POST /expenses 新增該月內任一日期的花費
   expected: HTTP 409，回應訊息提示須先取消結算
 
+- id: TC-EDGE-EXPENSE-007
+  req: REQ-EXPENSE-005
+  category: EDGE
+  priority: P0
+  script: tests/api/test_expenses.py::test_settlement_uses_game_month_not_calendar_month
+  preconditions: reward_ledger 有 2026-10 的結算列，2026-09 沒有
+  action: POST /expenses，date=2026-09-29（ISO 2026-W40，週四 10/1，依週歸屬規則屬 10 月）
+  expected: HTTP 409 MONTH_SETTLED（依週歸屬月判定，不是日曆月 9 月）；訊息含月份並提示「請先取消結算」
+
+- id: TC-EDGE-EXPENSE-008
+  req: REQ-EXPENSE-005
+  category: EDGE
+  priority: P0
+  script: tests/api/test_expenses.py::test_put_moving_into_settled_month_returns_409
+  preconditions: 一筆花費在未結算月；另一月已結算
+  action: PUT /expenses/{id} 把 date 改到已結算月內的日期
+  expected: HTTP 409 MONTH_SETTLED；花費日期不變
+
+- id: TC-EDGE-EXPENSE-009
+  req: REQ-EXPENSE-005
+  category: EDGE
+  priority: P0
+  script: tests/api/test_expenses.py::test_put_moving_out_of_settled_month_returns_409
+  preconditions: 一筆花費落在已結算月（直接插入 DB）
+  action: PUT /expenses/{id} 把 date 改到未結算月；PUT 同月只改備註；DELETE /expenses/{id}
+  expected: 三者皆 HTTP 409 MONTH_SETTLED（舊日期與新日期所屬月份都要檢查）；資料不變
+
+- id: TC-EDGE-EXPENSE-010
+  req: REQ-EXPENSE-005
+  category: EDGE
+  priority: P0
+  script: tests/api/test_expenses.py::test_unsettled_month_allows_create_update_delete
+  preconditions: 目標月份沒有 reward_ledger 紀錄
+  action: 依序 POST、PUT、DELETE 同一筆花費
+  expected: 201／200／204 皆成功（結算檢查只擋已結算月份）
+
+- id: TC-SEC-EXPENSE-011
+  req: REQ-NFR-005
+  category: SEC
+  priority: P0
+  script: tests/api/test_expenses.py::test_other_users_expenses_are_invisible
+  preconditions: 直接在 DB 插入 user_id=2 的花費；請求以 user 1 的金鑰送出（user_id 來自認證 dependency，不是請求參數）
+  action: GET 清單；GET／PUT／DELETE /expenses/{id} 指向 user_id=2 的那筆
+  expected: 清單不出現他人資料；by id 一律回 404（不是 403，不透露資料存在）；DB 資料不變（spec-gaps 8.2 → SRS v1.6 四章開頭權限段落）
+
 # ============================================================
 # 模組：INCOME — 收入與可支配金額（11.5高風險：固定支出過期仍扣、修改月薪影響過去）
 # ============================================================
@@ -318,6 +373,15 @@
   preconditions: 無
   action: PUT /months/{yyyy-mm}/income 月薪填負數
   expected: HTTP 400，回應訊息「月薪不可為負數」
+
+- id: TC-SEC-INCOME-005
+  req: REQ-NFR-005
+  category: SEC
+  priority: P0
+  script: tests/api/test_income.py::test_other_users_income_rows_are_invisible
+  preconditions: 直接在 DB 插入 user_id=2 的月薪／額外收入／固定支出；請求以 user 1 的金鑰送出（user_id 來自認證 dependency，不是請求參數）
+  action: GET 清單；GET／PUT／DELETE /extra-incomes、/recurring-expenses/{id} 指向 user_id=2 的那筆
+  expected: 清單不出現他人資料；by id 一律回 404（不是 403，不透露資料存在）；DB 資料不變（spec-gaps 8.2 → SRS v1.6 四章開頭權限段落）
 
 # ============================================================
 # 模組：CATEGORY — 消費分類體系（11.5高風險：分類異動、自訂上限）
@@ -385,6 +449,89 @@
   preconditions: 過去某月存在後續已停用的一級分類，該月有對應花費紀錄
   action: GET /months/{該過去月份}/analysis
   expected: 分析結果使用當月實際存在且啟用的分類結構計算，不追溯套用現在的結構（對應11.5「分類異動」風險）
+
+# --- v1.3／v1.4／v1.5 補充（REQ-CATEGORY-004 兩層基準總和檢查、009 excluded 值、010／011 雙向鎖定；Phase 3 一級分類 PUT／POST）---
+
+- id: TC-FUNC-CATEGORY-008
+  req: REQ-CATEGORY-004
+  category: FUNC
+  priority: P1
+  script: tests/unit/test_category_benchmark.py::test_hard_check_pass_within_range
+  preconditions: 內建6類（不含獎勵類）benchmark_min_pct合計70%、benchmark_max_pct合計115%（現行預設值）
+  action: 呼叫基準總和硬性檢查函式
+  expected: min合計70 ≤ 100 ≤ max合計115成立，判定通過，不擋下
+
+- id: TC-NEG-CATEGORY-009
+  req: REQ-CATEGORY-004
+  category: NEG
+  priority: P0
+  script: tests/unit/test_category_benchmark.py::test_hard_check_reject_when_range_excludes_100
+  preconditions: 建構一組一級分類使 benchmark_max_pct 合計 < 100（例如將某分類上限改到很低）
+  action: 新增或修改一級分類後觸發硬性檢查
+  expected: HTTP 400，回應訊息提示基準總和無法涵蓋100%的分配，拒絕儲存
+
+- id: TC-EDGE-CATEGORY-010
+  req: REQ-CATEGORY-004
+  category: EDGE
+  priority: P1
+  script: tests/unit/test_category_benchmark.py::test_soft_warning_outside_90_110_but_hard_check_passes
+  preconditions: 建構一組一級分類，中點總和為85%（<90%），但min合計≤100≤max合計仍成立
+  action: 新增或修改一級分類後觸發兩層檢查
+  expected: 硬性檢查通過（回應201，成功寫入），但回應內容含警示訊息，提示中點總和85%落在90-110%範圍外
+
+- id: TC-FUNC-CATEGORY-011
+  req: REQ-CATEGORY-004
+  category: FUNC
+  priority: P0
+  script: tests/unit/test_category_benchmark.py::test_excluded_category_not_counted_in_benchmark_sum
+  preconditions: 「獎勵」一級分類 necessity=excluded，benchmark_min_pct／benchmark_max_pct 皆為 NULL
+  action: 計算基準總和（硬性與軟性兩層）
+  expected: 「獎勵」分類不計入 min／max／中點的加總，計算結果只反映 counts_toward_target=true 的分類
+
+- id: TC-FUNC-CATEGORY-012
+  req: REQ-CATEGORY-009
+  category: FUNC
+  priority: P1
+  script: tests/api/test_categories.py::test_reward_necessity_stored_as_excluded_not_null
+  preconditions: 系統已 seed 「獎勵」一級分類
+  action: GET /category-groups，檢視「獎勵」分類的 necessity 欄位
+  expected: necessity 欄位值為字串 "excluded"，非 NULL；benchmark_min_pct 與 benchmark_max_pct 欄位為 NULL
+
+- id: TC-NEG-CATEGORY-013
+  req: REQ-CATEGORY-010
+  category: NEG
+  priority: P0
+  script: tests/api/test_categories.py::test_update_non_reward_group_to_excluded_rejected
+  preconditions: 存在內建非獎勵類一級分類（如「樂」，necessity=want）
+  action: PUT /category-groups/{id}，body 帶 necessity=excluded
+  expected: HTTP 400；再次 GET 該分類，necessity 仍為 want，基準欄位未變更
+
+- id: TC-NEG-CATEGORY-014
+  req: REQ-CATEGORY-010
+  category: NEG
+  priority: P1
+  script: tests/api/test_categories.py::test_create_custom_group_with_excluded_rejected
+  preconditions: 自訂一級分類未達 2 個上限
+  action: POST /category-groups 新增自訂一級分類，necessity=excluded，其餘欄位合法
+  expected: HTTP 400；category_groups 筆數不變，被指定搬移的二級分類仍留在原分類
+
+- id: TC-NEG-CATEGORY-015
+  req: REQ-CATEGORY-011
+  category: NEG
+  priority: P0
+  script: tests/api/test_categories.py::test_update_reward_group_necessity_locked
+  preconditions: 獎勵一級分類（code='REWARD'），necessity=excluded（seed 值）
+  action: PUT /category-groups/{id}（該筆為獎勵類），body 帶 necessity=want（或 necessary／flexible 任一非 excluded 值）
+  expected: HTTP 400；再次 GET 該分類，necessity 仍為 excluded，其餘欄位未變更
+
+- id: TC-SEC-CATEGORY-016
+  req: REQ-NFR-005
+  category: SEC
+  priority: P0
+  script: tests/api/test_categories.py::test_other_users_categories_are_invisible
+  preconditions: 直接在 DB 插入 user_id=2 的二級分類；請求以 user 1 的金鑰送出（user_id 來自認證 dependency，不是請求參數）
+  action: GET 清單；GET／PUT／DELETE /categories/{id} 指向 user_id=2 的那筆
+  expected: 清單不出現他人資料；by id 一律回 404（不是 403，不透露資料存在）；DB 資料不變（spec-gaps 8.2 → SRS v1.6 四章開頭權限段落）
 
 # ============================================================
 # 模組：SCORE — 週計分（公式邊界與連勝/超支狀態機）
@@ -666,6 +813,15 @@
   action: 觸發一個500錯誤（如傳入異常參數導致未捕捉例外）
   expected: 回應內容不包含traceback或內部路徑資訊
 
+- id: TC-SEC-AUTH-003
+  req: REQ-AUTH-001
+  category: SEC
+  priority: P0
+  script: tests/api/test_error_format.py::test_current_user_id_comes_from_settings_not_request
+  preconditions: 無認證期，settings.default_user_id=1
+  action: 請求以查詢參數或 body 帶任意 user_id 值
+  expected: 服務端一律以認證 dependency 注入的 user_id=1 處理，請求裡的 user_id 不影響結果
+
 # --- REQ-AUTH-000 臨時 API 金鑰閘門（Phase 1～2 無認證期，Phase 3 換 JWT 後整組移除；規格見 docs/spec-gaps.md 第 5 節）---
 
 - id: TC-SEC-AUTH-000a
@@ -752,6 +908,87 @@
   expected: 白名單來源回 200 且 Allow-Origin 等於各自的 Origin；非白名單來源回應不含 Allow-Origin；任何情況不得回 *
 
 # ============================================================
+# 模組：ERROR — 統一錯誤格式（REQ-NFR-010；已實作於 phase-1-core-api，本版只登記既有測試）
+# ============================================================
+
+- id: TC-FUNC-ERROR-001
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P1
+  script: tests/api/test_error_format.py::test_api_error_uses_unified_envelope
+  preconditions: 各 ApiError 子類別（VALIDATION_ERROR、INACTIVE_REFERENCE、CARD_IN_USE、NOT_FOUND、MONTH_SETTLED、DUPLICATE_NAME）
+  action: 由 service raise 各子類別
+  expected: '回對應狀態碼（400／403／404／409）與 {"error": {"code", "message", "fields"}}，fields 只在欄位層級錯誤時有值'
+
+- id: TC-FUNC-ERROR-002
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P0
+  script: tests/api/test_error_format.py::test_request_validation_returns_400_with_srs_field_messages
+  preconditions: 任一業務 POST／PUT 端點
+  action: 送出缺欄位、型別錯、超長、多餘欄位的 body
+  expected: HTTP 400（不是 422）VALIDATION_ERROR；fields 逐字用 SRS 欄位規格表文案，一個欄位一句不分失敗原因；多餘欄位為「不允許的欄位」
+
+- id: TC-FUNC-ERROR-003
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P1
+  script: tests/api/test_error_format.py::test_money_accepts_number_and_serializes_as_number
+  preconditions: 金額欄位（NUMERIC(12,2)）
+  action: 請求以 JSON number 送金額（最多兩位小數）；讀回
+  expected: 接受並回 JSON number；超過兩位小數 → 400
+
+- id: TC-FUNC-ERROR-004
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P0
+  script: tests/api/test_error_format.py::test_unauthorized_body_unchanged
+  preconditions: 無金鑰或錯誤金鑰
+  action: 呼叫任一受保護端點
+  expected: '401 維持 {"detail": "unauthorized"}，不套用統一格式'
+
+- id: TC-FUNC-ERROR-005
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P1
+  script: tests/api/test_error_format.py::test_openapi_declares_400_envelope_and_no_422
+  preconditions: DEBUG=true 可取得 /openapi.json
+  action: 讀 OpenAPI
+  expected: error_responses 宣告的 400 指向 ErrorResponse；FastAPI 自動加的 422 與 HTTPValidationError 全部移除
+
+# ============================================================
+# 模組：CONTRACT — 前端實際 payload × 後端 Pydantic schema（docs/adr/0008；擋「前後端對資料形狀的理解不一致」）
+# ============================================================
+# req 暫掛 REQ-NFR-010，待新增 REQ-NFR-011 後改掛，見 spec-gaps 11.4
+
+- id: TC-FUNC-CONTRACT-001
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P0
+  script: tests/integration/test_frontend_payload_contract.py::test_frontend_payloads_accepted_by_backend_schemas
+  preconditions: Node.js 22 與 frontend/node_modules；frontend/scripts/payload-dump.ts 只呼叫表單真正用的組裝函式（lib/*-payload.ts）
+  action: subprocess 執行 npm run payload:dump，逐筆以對應的 Create／Update schema model_validate
+  expected: 全部接受；任一筆被拒即失敗並列出 case id、pydantic 錯誤（含 extra_forbidden 欄位名）與 payload
+
+- id: TC-FUNC-CONTRACT-002
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P0
+  script: tests/integration/test_frontend_payload_contract.py::test_frontend_payload_dump_covers_required_scenarios
+  preconditions: 同 CONTRACT-001
+  action: 比對 dump 的 scenario 集合與後端登記的 REQUIRED_SCENARIOS
+  expected: 卡片新增／編輯／停用／啟用、花費新增各支付方式／退款／編輯、月收入 PUT、額外收入、固定支出、二級分類新增／改名／停用 每種至少一筆；兩邊集合相等
+
+- id: TC-FUNC-CONTRACT-003
+  req: REQ-NFR-010
+  category: FUNC
+  priority: P0
+  script: tests/integration/test_frontend_payload_contract.py::test_frontend_card_create_never_sends_is_active
+  preconditions: 同 CONTRACT-001（2026-09-24 Pages 新增卡片 400 的回歸）
+  action: 檢查所有 schema=CardCreate 的 case
+  expected: payload 不含 is_active
+
+# ============================================================
 # 模組：E2E — 端到端流程（架構描述11.2 P0流程）
 # ============================================================
 
@@ -785,3 +1022,13 @@
 #                     REQ-AUTH-000 五條（TC-SEC-AUTH-000a～e）、CORS 三條（TC-SEC-CORS-001～003，
 #                     REQ-NFR-009）、DOCS 一條（TC-SEC-DOCS-001，REQ-NFR-004）；實際 78 條（v1.0 檔頭寫 67 條，實際 64 條，本版只補新條目未追究差異）。
 #                     三個 REQ 目前只存在 docs/spec-gaps.md，待 SRS 補述
+# v1.2 | 2026-09-24 | 依據改為 SRS+FS v1.6.1（開發端維護的第一版）。合併三份補充 YAML：v1.3 補充 5 條
+#                     （TC-FUNC-CATEGORY-008、TC-NEG-CATEGORY-009、TC-EDGE-CATEGORY-010、TC-FUNC-CATEGORY-011、
+#                     TC-FUNC-CATEGORY-012）、v1.4 補充 2 條（TC-NEG-CATEGORY-013、014）、v1.5 補充 1 條
+#                     （TC-NEG-CATEGORY-015），內容逐字沿用。登記 repo 既有測試（只登記、不寫新測試）：
+#                     REQ-NFR-010 統一錯誤格式 5 條（TC-FUNC-ERROR-001～005）、前端 payload 契約測試 3 條
+#                     （TC-FUNC-CONTRACT-001～003，req 暫掛 REQ-NFR-010「未知欄位 → 400」那一項）、使用者隔離 4 條
+#                     （TC-SEC-CARD-005、TC-SEC-EXPENSE-011、TC-SEC-INCOME-005、TC-SEC-CATEGORY-016，req 掛 REQ-NFR-005
+#                     「不得讀寫他人資料」；user_id 來源由 TC-SEC-AUTH-003 覆蓋 REQ-AUTH-001）＋ user_id 來源 1 條（TC-SEC-AUTH-003）、已結算月份判定 EDGE 4 條
+#                     （TC-EDGE-EXPENSE-007～010，REQ-EXPENSE-005）。合計 78 + 8 + 17 = 103 條。
+#                     本版起 spec-gaps.md 不再是規格來源（第 5～8 節已回收進 SRS v1.6），檔頭依據移除該項。

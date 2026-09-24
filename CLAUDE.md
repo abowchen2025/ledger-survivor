@@ -4,10 +4,12 @@
 
 ## 權威文件（改動前先讀，衝突時以此順序為準）
 
-1. `docs/srs_fs_v1_2.md` — SRS+FS，功能模組 4.1～4.12 各含畫面／API／業務規則／驗收條件；每條規則帶 REQ 編號，附錄含需求追溯矩陣
-2. `docs/test_conditions_v1_1.yaml` — 測試條件，Claude Code 依 `script` 路徑產生對應測試碼；`req` 欄位回追 SRS 的 REQ 編號
-3. `docs/architecture_v2_2.md` — 系統架構描述，設計理由與範圍界線
-4. `docs/adr/` — 架構決策記錄，一個決策一個檔
+1. `docs/srs_fs_v1_6_1.md` — SRS+FS，功能模組 4.1～4.12 各含畫面／API／業務規則／驗收條件；每條規則帶 REQ 編號，附錄含需求追溯矩陣與回收矛盾清單
+2. `docs/test_conditions_v1_2.yaml` — 測試條件，Claude Code 依 `script` 路徑產生對應測試碼；`req` 欄位回追 SRS 的 REQ 編號
+3. `docs/adr/` — 架構決策記錄，一個決策一個檔（ADR 0003～0008 都比架構描述 v2.2 新，衝突時以 ADR 為準）
+4. `docs/architecture_v2_2.md` — 系統架構描述，設計理由與範圍界線
+
+**SRS 由開發端規劃者維護。** 實作中發現規格缺口，一律記入 `docs/spec-gaps.md` 最新一節，不直接改 SRS；SRS 的修改只在規劃者指示的 docs PR 中進行。`spec-gaps.md` 已回收的小節不刪（SRS 正文引用它們），只在標題標記狀態。
 
 ## 技術架構
 

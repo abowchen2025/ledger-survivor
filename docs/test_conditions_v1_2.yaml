@@ -107,7 +107,7 @@
   expected: HTTP 403，回應訊息提示改用停用
 
 - id: TC-SEC-CARD-005
-  req: REQ-AUTH-001
+  req: REQ-NFR-005
   category: SEC
   priority: P0
   script: tests/api/test_cards.py::test_other_users_cards_are_invisible
@@ -326,7 +326,7 @@
   expected: 201／200／204 皆成功（結算檢查只擋已結算月份）
 
 - id: TC-SEC-EXPENSE-011
-  req: REQ-AUTH-001
+  req: REQ-NFR-005
   category: SEC
   priority: P0
   script: tests/api/test_expenses.py::test_other_users_expenses_are_invisible
@@ -375,7 +375,7 @@
   expected: HTTP 400，回應訊息「月薪不可為負數」
 
 - id: TC-SEC-INCOME-005
-  req: REQ-AUTH-001
+  req: REQ-NFR-005
   category: SEC
   priority: P0
   script: tests/api/test_income.py::test_other_users_income_rows_are_invisible
@@ -525,7 +525,7 @@
   expected: HTTP 400；再次 GET 該分類，necessity 仍為 excluded，其餘欄位未變更
 
 - id: TC-SEC-CATEGORY-016
-  req: REQ-AUTH-001
+  req: REQ-NFR-005
   category: SEC
   priority: P0
   script: tests/api/test_categories.py::test_other_users_categories_are_invisible
@@ -959,6 +959,7 @@
 # ============================================================
 # 模組：CONTRACT — 前端實際 payload × 後端 Pydantic schema（docs/adr/0008；擋「前後端對資料形狀的理解不一致」）
 # ============================================================
+# req 暫掛 REQ-NFR-010，待新增 REQ-NFR-011 後改掛，見 spec-gaps 11.4
 
 - id: TC-FUNC-CONTRACT-001
   req: REQ-NFR-010
@@ -1027,7 +1028,7 @@
 #                     （TC-NEG-CATEGORY-015），內容逐字沿用。登記 repo 既有測試（只登記、不寫新測試）：
 #                     REQ-NFR-010 統一錯誤格式 5 條（TC-FUNC-ERROR-001～005）、前端 payload 契約測試 3 條
 #                     （TC-FUNC-CONTRACT-001～003，req 暫掛 REQ-NFR-010「未知欄位 → 400」那一項）、使用者隔離 4 條
-#                     （TC-SEC-CARD-005、TC-SEC-EXPENSE-011、TC-SEC-INCOME-005、TC-SEC-CATEGORY-016，req 依 spec-gaps 8.2
-#                     回追 REQ-AUTH-001）＋ user_id 來源 1 條（TC-SEC-AUTH-003）、已結算月份判定 EDGE 4 條
+#                     （TC-SEC-CARD-005、TC-SEC-EXPENSE-011、TC-SEC-INCOME-005、TC-SEC-CATEGORY-016，req 掛 REQ-NFR-005
+#                     「不得讀寫他人資料」；user_id 來源由 TC-SEC-AUTH-003 覆蓋 REQ-AUTH-001）＋ user_id 來源 1 條（TC-SEC-AUTH-003）、已結算月份判定 EDGE 4 條
 #                     （TC-EDGE-EXPENSE-007～010，REQ-EXPENSE-005）。合計 78 + 8 + 17 = 103 條。
 #                     本版起 spec-gaps.md 不再是規格來源（第 5～8 節已回收進 SRS v1.6），檔頭依據移除該項。

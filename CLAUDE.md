@@ -119,4 +119,6 @@ Phase 1 第三輪（分支 `phase-1-quick-entry`，PR #5，2026-09-23）：前�
 
 Phase 1 修正輪（分支 `fix-card-create-payload`，2026-09-24）：Pages 新增卡片 400 的修正——payload 改在 `lib/card-payload.ts`、`lib/expense-payload.ts` 逐欄位組裝、新增不送 `is_active`、顏色送出值與畫面一致、`finally` 重設送出狀態、無對應輸入框的欄位錯誤顯示在表單頂部；新增 `npm run payload:dump` 與後端契約測試 `tests/integration/test_frontend_payload_contract.py`（`docs/adr/0008`）。
 
+Phase 1 第四輪（分支 `phase-1-settings-calendar`，2026-09-24）：設定頁收入設定（月份預設遊戲月、月薪三種狀態、額外收入、固定支出含過期灰階）、設定頁分類管理（一級唯讀、二級 CRUD、刪除 200／204 兩種結果、共用 `category-store`）、月曆頁（`lib/calendar-grid.ts` 以 week.ts 產生格線、跨月週標籤、每日與每週合計排除獎勵、點日期沿用 `WeekExpenseList`）。新寫入全部進 `payload:dump` 與契約測試。規格決定見 `docs/spec-gaps.md` 第 9 節。
+
 已完成：Phase 0a（後端骨架、12 張表、seed、`week_rule` 測試）、Phase 0b（前端骨架六頁、PWA、前後端 `week_rule` 一致性測試 TC-SEC-WEEK-004、CI 三條 workflow、Dockerfile、README；`railway.json` 已刪除，Railway 設定只在 UI）。路由方式 HashRouter 已採納（`docs/adr/0004`）；雲端 migration 走 Railway pre-deploy、健康檢查拆 live／ready（`docs/adr/0006`）。Pages 與 Railway 皆已上線，見 `docs/deployment-setup.md` 開頭「目前狀態」。

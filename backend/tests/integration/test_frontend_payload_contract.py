@@ -31,7 +31,15 @@ import pytest
 from pydantic import BaseModel, ValidationError
 
 from app.schemas.card import CardCreate, CardUpdate
+from app.schemas.category import CategoryCreate, CategoryUpdate
 from app.schemas.expense import ExpenseCreate, ExpenseUpdate
+from app.schemas.income import (
+    ExtraIncomeCreate,
+    ExtraIncomeUpdate,
+    MonthIncomeUpdate,
+    RecurringExpenseCreate,
+    RecurringExpenseUpdate,
+)
 
 pytestmark = [pytest.mark.p0, pytest.mark.integration]
 
@@ -44,6 +52,14 @@ SCHEMAS: dict[str, type[BaseModel]] = {
     "CardUpdate": CardUpdate,
     "ExpenseCreate": ExpenseCreate,
     "ExpenseUpdate": ExpenseUpdate,
+    # phase-1-settings-calendar：收入設定與二級分類
+    "MonthIncomeUpdate": MonthIncomeUpdate,
+    "ExtraIncomeCreate": ExtraIncomeCreate,
+    "ExtraIncomeUpdate": ExtraIncomeUpdate,
+    "RecurringExpenseCreate": RecurringExpenseCreate,
+    "RecurringExpenseUpdate": RecurringExpenseUpdate,
+    "CategoryCreate": CategoryCreate,
+    "CategoryUpdate": CategoryUpdate,
 }
 
 # 每個情境至少要有一筆 case（與 payload-dump.ts 的 Scenario 型別一致）
@@ -58,6 +74,15 @@ REQUIRED_SCENARIOS = {
     "expense_create_transfer",
     "expense_create_refund",
     "expense_edit",
+    # phase-1-settings-calendar
+    "month_income_put",
+    "extra_income_create",
+    "extra_income_edit",
+    "recurring_expense_create",
+    "recurring_expense_edit",
+    "category_create",
+    "category_rename",
+    "category_deactivate",
 }
 
 
@@ -114,7 +139,8 @@ def test_frontend_payloads_accepted_by_backend_schemas(dump: dict) -> None:
 
 
 def test_frontend_payload_dump_covers_required_scenarios(dump: dict) -> None:
-    """涵蓋面：卡片新增／編輯／停用／啟用、花費新增（現金、信用卡、行動支付、轉帳、退款）／編輯至少各一筆。"""
+    """涵蓋面：卡片新增／編輯／停用／啟用、花費新增（現金、信用卡、行動支付、轉帳、退款）／編輯、
+    月收入 PUT、額外收入新增／編輯、固定支出新增／編輯、二級分類新增／改名／停用，至少各一筆。"""
     scenarios = {c["scenario"] for c in dump["cases"]}
     missing = sorted(REQUIRED_SCENARIOS - scenarios)
     assert not missing, f"前端 payload dump 缺少情境：{missing}（見 frontend/scripts/payload-dump.ts）"
